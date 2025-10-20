@@ -4,12 +4,12 @@
 	"main": "dist/LoxClient.js",
 	"type": "module",
 	"types": "./dist/LoxClient.d.ts",
-	"svelte": "src/index.js",
+	"svelte": "./dist/LoxClient.js",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && npm run prepack",
 		"preview": "vite preview",
-		"prepare": "vite build && npm run prepack",
+		"prepare": "npm run build",
 		"prepack": "svelte-kit sync && svelte-package && publint",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -52,7 +52,7 @@
 		"svelte-check": "^4.0.0",
 		"typescript": "^5.0.0",
 		"typescript-eslint": "^8.46.1",
-		"vite": "^7.0.4"
+		"vite": "^6.0.0"
 	},
 	"author": "Martin Barnasconi",
 	"license": "MIT",
@@ -60,10 +60,8 @@
 		"svelte, websocket"
 	],
 	"dependencies": {
-		"-": "^0.0.1",
 		"buffer": "^6.0.3",
 		"crypto-browserify": "^3.12.1",
-		"D": "^1.0.0",
 		"vite-plugin-node-polyfills": "^0.24.0"
 	}
 }

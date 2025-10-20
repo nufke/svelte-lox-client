@@ -25,3 +25,10 @@ vite.config.ts.timestamp-*
 
 # Visual Studio Code
 .vscode/
+
+# Archives
+*.tar.gz
+*.tgz
+
+# local locked files
+*-lock.json
