@@ -1,9 +1,9 @@
 # svelte-lox-client
 
-This Typescript-based Svelte Component library implements the Loxone WebSocket API for browser-based Svelte apps.
+This Typescript-based Svelte Component Library implements the Loxone WebSocket API for browser-based Svelte apps.
 This library aims to use the Web APIs supported by browsers and only imports a limited set of browserified libraries.
 
-The `svelte-lox-client` library is used in the [`LoxBuddy App`](https://github.com/nufke/loxbuddy/) to establish a 
+This library is used in the [LoxBuddy App](https://github.com/nufke/loxbuddy/) to establish a 
 WebSocket connection to the Miniserver.
 
 ## Issues and questions
@@ -14,10 +14,10 @@ Please submit your issues and questions via the GitHub issue tracker: https://gi
 
 This library has been derived from the following libraries:
 
- * [loxone-ts-api](https://github.com/andrasg/loxone-ts-api/) of @andrasg
- * [node-lox-ws-api](https://github.com/codm/node-lox-ws-api) of @codm and @alladdin
+ * [loxone-ts-api](https://github.com/andrasg/loxone-ts-api/) of [@andrasg](https://github.com/andrasg/)
+ * [node-lox-ws-api](https://github.com/codm/node-lox-ws-api) of [@codm](https://github.com/codm/) and [@alladdin](https://github.com/alladdin/)
 
-Special thanks and credits to @andrasg, @codm and @alladdin!
+Special thanks and credits to [@andrasg](https://github.com/andrasg/), [@codm](https://github.com/codm/) and [@alladdin](https://github.com/alladdin/)!
 
 ## Disclaimer
 

@@ -1,6 +1,6 @@
-import { LoxEvent } from '../LoxEvents/LoxEvent.js';
-import UUID from '../WebSocketMessages/UUID.js';
-import Control from './Control.js';
+import { LoxEvent } from '../LoxEvents/LoxEvent';
+import UUID from '../WebSocketMessages/UUID';
+import Control from './Control';
 
 class State {
 	uuid: UUID;

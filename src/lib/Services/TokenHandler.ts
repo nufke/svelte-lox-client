@@ -88,7 +88,7 @@ class TokenHandler {
 			throw new Error(`Failed to acquire JWT: ${jwtResponse.code}`);
 		}
 		if (!jwtResponse.value) {
-			throw new Error(`jwtResponse.value is undefined`);
+			throw new Error('jwtResponse.value is undefined');
 		}
 
 		this.log.info('Acquired token');
@@ -125,7 +125,7 @@ class TokenHandler {
 		if (authWithTokenResponse.code !== 200) {
 			throw new Error(`Failed to authenticate with existing token: ${authWithTokenResponse.code}`);
 		}
-		this.log.info(`Authenticated with existing token`);
+		this.log.info('Authenticated with existing token');
 
 		this.token = token;
 		this.processTokenResponse(authWithTokenResponse);
@@ -145,7 +145,7 @@ class TokenHandler {
 				/* ignore any exceptions */
 			}
 			this.clearScheduledRefresh();
-			this.log.info(`Token killed`);
+			this.log.info('Token killed');
 		}
 	}
 
@@ -193,7 +193,7 @@ class TokenHandler {
 
 		this.refreshTimer = setTimeout(async () => {
 			try {
-				this.log.info(`Reached scheduled token refresh time`);
+				this.log.info('Reached scheduled token refresh time');
 				if (msUntilExpiry < 0) {
 					this.log.info('Token already expired, acquiring a new one');
 					await this.acquireToken();

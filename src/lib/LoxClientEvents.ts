@@ -1,8 +1,8 @@
-import LoxClientState from './LoxClientState.js';
-import LoxTextEvent from './LoxEvents/LoxTextEvent.js';
-import LoxValueEvent from './LoxEvents/LoxValueEvent.js';
-import FileMessage from './WebSocketMessages/FileMessage.js';
-import TextMessage from './WebSocketMessages/TextMessage.js';
+import LoxClientState from './LoxClientState';
+import LoxTextEvent from './LoxEvents/LoxTextEvent';
+import LoxValueEvent from './LoxEvents/LoxValueEvent';
+import FileMessage from './WebSocketMessages/FileMessage';
+import TextMessage from './WebSocketMessages/TextMessage';
 
 export interface LoxClientEvents {
 	connected: () => void;

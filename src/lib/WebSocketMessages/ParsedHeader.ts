@@ -1,5 +1,5 @@
-import MessageType from './MessageType.js';
-import WsBinHdr from './WsBinHdr.js';
+import MessageType from './MessageType';
+import WsBinHdr from './WsBinHdr';
 
 class ParsedHeader extends WsBinHdr {
 	messageType: MessageType;

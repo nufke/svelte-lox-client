@@ -91,7 +91,7 @@ class Auth {
 			throw new Error(`Failed to getkey2: ${getKeyResponse.code}`);
 		}
 		if (!getKeyResponse.value) {
-			throw new Error(`getkeyresponse.value is undefined`);
+			throw new Error('getkeyresponse.value is undefined');
 		}
 
 		// server returns the key as a hex-encoded string; convert to raw bytes

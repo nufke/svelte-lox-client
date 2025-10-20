@@ -1,4 +1,4 @@
-import { maskEnc, maskProperties } from '../Utils/Masker.js';
+import { maskEnc, maskProperties } from '../Utils/Masker';
 
 class TextMessage {
 	private json;

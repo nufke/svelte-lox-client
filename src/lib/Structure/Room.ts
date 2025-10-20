@@ -1,4 +1,4 @@
-import UUID from '../WebSocketMessages/UUID.js';
+import UUID from '../WebSocketMessages/UUID';
 
 class Room {
 	uuid: UUID;

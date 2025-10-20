@@ -1,6 +1,6 @@
 import WebSocketConnection from './Services/WebSocketConnection';
 import { type WebSocketConnectionEvents } from './Services/WebSocketConnectionEvents';
-import Auth from './Services/Auth.js';
+import Auth from './Services/Auth';
 import { LoxClientOptions } from './LoxClientOptions';
 import LoxClientState from './LoxClientState';
 import AutoReconnect from './Services/AutoReconnect';
@@ -255,10 +255,7 @@ export class LoxClient extends EventTarget {
 			return await this.connection?.sendUnencryptedFileCommand(filename, timeoutOverride);
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} catch (error: any) {
-			this.log.error(
-				`${filename} - Could not send file command: ${error.message} - ${error.cause}`,
-				error
-			);
+			this.log.error(`${filename} - Could not send file command: ${error.message} - ${error.cause}`, error);
 			throw new Error(`${filename} - Could not send file command`, { cause: error as Error });
 		}
 	}
@@ -274,34 +271,21 @@ export class LoxClient extends EventTarget {
 		try {
 			this.ensureReadyState('Not connected and authenticated, cannot send command');
 			if (this.isStructureFileParsed && !this.controls.has(uuid)) {
-				this.log.warn(
-					`Control UUID '${uuid}' is not present in the structure file, control command will likely fail`
-				);
+				this.log.warn(`Control UUID '${uuid}' is not present in the structure file, control command will likely fail`);
 			}
 
 			const encrypted = !this.isGen2;
 			const fullCommand = `jdev/sps/io/${uuid}/${command}`;
-			const response = await this.connection.sendCommand<TextMessage>(
-				fullCommand,
-				encrypted,
-				timeoutOverride
-			);
+			const response = await this.connection.sendCommand<TextMessage>(fullCommand, encrypted, timeoutOverride);
 			if (response.code === 404) this.log.error(`Miniserver control '${uuid}' not found`);
 			else if (response.code !== 200)
-				this.log.error(
-					`${uuid}/${command} - unknown error, response was not 200 OK, but ${response.code}`
-				);
+				this.log.error(`${uuid}/${command} - unknown error, response was not 200 OK, but ${response.code}`);
 			if (response.value === '0')
-				this.log.error(
-					`Miniserver command '${command}' invalid, response indicates unsuccessful execution (response.value = 0)`
-				);
+				this.log.error(`Miniserver command '${command}' invalid, response indicates unsuccessful execution (response.value = 0)`);
 			return response;
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} catch (error: any) {
-			this.log.error(
-				`${uuid}/${command} - Could not execute control command: ${error.message} - ${error.cause}`,
-				error
-			);
+			this.log.error(`${uuid}/${command} - Could not execute control command: ${error.message} - ${error.cause}`, error);
 			throw new Error(`${uuid}/${command} - Could not execute control command`, {
 				cause: error as Error
 			});
@@ -314,13 +298,13 @@ export class LoxClient extends EventTarget {
 	 */
 	async parseStructureFile() {
 		if (!this.structureFile) {
-			this.log.warn(`No structure file loaded, trying to get it`);
+			this.log.warn('No structure file loaded, trying to get it');
 			await this.getStructureFile();
 		}
 
-		this.log.info(`Parsing structure file...`);
+		this.log.info('Parsing structure file...');
 
-		this.log.info(`Processing rooms...`);
+		this.log.info('Processing rooms...');
 		for (const uuid in this.structureFile.rooms) {
 			const room = this.structureFile.rooms[uuid];
 			this.log.debug(`Found room with UUID ${uuid}, name ${room.name}`);
@@ -553,10 +537,7 @@ export class LoxClient extends EventTarget {
 		this.addEventListener(event as string, listener as (...args: any[]) => void);
 	}
 
-	emit<K extends keyof LoxClientEvents>(
-		event: K,
-		...args: Parameters<LoxClientEvents[K]>
-	): boolean {
+	emit<K extends keyof LoxClientEvents>(event: K, ...args: Parameters<LoxClientEvents[K]>): boolean {
 		return this.dispatchEvent(new CustomEvent(event, { detail: args[0] }));
 	}
 }

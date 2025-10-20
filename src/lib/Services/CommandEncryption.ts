@@ -1,5 +1,5 @@
 import { createCipheriv, randomBytes } from 'crypto';
-import Auth from './Auth.js';
+import Auth from './Auth';
 
 class CommandEncryption {
 	auth: Auth;

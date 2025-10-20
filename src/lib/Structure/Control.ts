@@ -1,5 +1,5 @@
-import Room from './Room.js';
-import State from './State.js';
+import Room from './Room';
+import State from './State';
 
 class Control {
 	uuid: string;

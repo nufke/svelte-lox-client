@@ -10,7 +10,7 @@ import ParsedHeader from '../WebSocketMessages/ParsedHeader';
 import LoxClient from '../LoxClient';
 import Logger from '../Utils/Logger';
 import { maskEnc } from '../Utils/Masker';
-import { type WebSocketConnectionEvents } from './WebSocketConnectionEvents.js';
+import { type WebSocketConnectionEvents } from './WebSocketConnectionEvents';
 
 // Generic pending queue entry for text/file command promises
 interface PendingQueueEntry<T extends FileMessage | TextMessage> {
