@@ -2,6 +2,7 @@ import Auth from './Auth';
 import { hash, hmacHash } from '../Utils/Hasher';
 import WebSocketConnection from '../Services/WebSocketConnection';
 import TextMessage from '../WebSocketMessages/TextMessage';
+import Logger from '../Utils/Logger';
 
 class TokenHandler {
 	token: string | undefined;
@@ -20,8 +21,10 @@ class TokenHandler {
 	private refreshRetryMs = 5 * 60 * 1000; // 5 minutes
 	private refreshMaxRetries = 5;
 	private refreshRetries = 0;
+	log: Logger;
 
-	constructor(auth: Auth, connection: WebSocketConnection, username: string, password: string, deviceId: string) {
+	constructor(auth: Auth, log: Logger, connection: WebSocketConnection, username: string, password: string, deviceId: string) {
+		this.log = log;
 		this.auth = auth;
 		this.connection = connection;
 		this.username = username;
@@ -37,7 +40,7 @@ class TokenHandler {
 		const msUntilExpiry = this.validUntilDateUTC.getTime() - Date.now();
 
 		if (msUntilExpiry < 0) {
-			console.warn('Token cannot be refreshed any more as it expired. Trying to acquire a new one');
+			this.log.warn('Token cannot be refreshed any more as it expired. Trying to acquire a new one');
 			this.acquireToken();
 			return;
 		}
@@ -88,7 +91,7 @@ class TokenHandler {
 			throw new Error(`jwtResponse.value is undefined`);
 		}
 
-		console.info('Acquired token');
+		this.log.info('Acquired token');
 
 		this.token = jwtResponse.value.token;
 		this.processTokenResponse(jwtResponse);
@@ -105,10 +108,10 @@ class TokenHandler {
 		const checkTokenCommand = `jdev/sys/checktoken/${tokenHash}/${this.username}`;
 		const checkTokenResponse = await this.connection.sendEncryptedTextCommand(checkTokenCommand);
 		if (checkTokenResponse.code !== 200) {
-			console.info(`Token is not valid: ${checkTokenResponse.code}`);
+			this.log.info(`Token is not valid: ${checkTokenResponse.code}`);
 			return;
 		}
-		console.info(`Token is valid: ${checkTokenResponse.code}`);
+		this.log.info(`Token is valid: ${checkTokenResponse.code}`);
 	}
 
 	async authenticateWithToken(token: string) {
@@ -122,7 +125,7 @@ class TokenHandler {
 		if (authWithTokenResponse.code !== 200) {
 			throw new Error(`Failed to authenticate with existing token: ${authWithTokenResponse.code}`);
 		}
-		console.info(`Authenticated with existing token`);
+		this.log.info(`Authenticated with existing token`);
 
 		this.token = token;
 		this.processTokenResponse(authWithTokenResponse);
@@ -142,7 +145,7 @@ class TokenHandler {
 				/* ignore any exceptions */
 			}
 			this.clearScheduledRefresh();
-			console.info(`Token killed`);
+			this.log.info(`Token killed`);
 		}
 	}
 
@@ -153,7 +156,7 @@ class TokenHandler {
 		const baseMs = Date.UTC(2009, 0, 1, 0, 0, 0);
 		this.validUntilDateUTC = new Date(baseMs + seconds * 1000);
 
-		console.info(`Token valid until: ${this.validUntilDateUTC.toLocaleString()}`);
+		this.log.info(`Token valid until: ${this.validUntilDateUTC.toLocaleString()}`);
 
 		// Schedule automatic refresh
 		this.refreshRetries = 0;
@@ -186,26 +189,26 @@ class TokenHandler {
 
 		const refreshDate = new Date(Date.now() + finalMs);
 
-		console.info(`Scheduling token refresh at ${refreshDate.toLocaleString()}`);
+		this.log.info(`Scheduling token refresh at ${refreshDate.toLocaleString()}`);
 
 		this.refreshTimer = setTimeout(async () => {
 			try {
-				console.info(`Reached scheduled token refresh time`);
+				this.log.info(`Reached scheduled token refresh time`);
 				if (msUntilExpiry < 0) {
-					console.info('Token already expired, acquiring a new one');
+					this.log.info('Token already expired, acquiring a new one');
 					await this.acquireToken();
 				} else {
-					console.info('Attempting refresh of existing token');
+					this.log.info('Attempting refresh of existing token');
 					await this.refreshToken();
 				}
 			} catch (err) {
 				// on failure, retry with backoff until max retries
 				this.refreshRetries = (this.refreshRetries || 0) + 1;
-				console.error(`Token refresh failed (attempt ${this.refreshRetries}):`, err);
+				this.log.error(`Token refresh failed (attempt ${this.refreshRetries}):`, err);
 				if (this.refreshRetries <= this.refreshMaxRetries) {
 					this.refreshTimer = setTimeout(() => this.scheduleRefresh(), this.refreshRetryMs * this.refreshRetries);
 				} else {
-					console.error('Max token refresh retries reached, giving up');
+					this.log.error('Max token refresh retries reached, giving up');
 				}
 			}
 		}, finalMs);

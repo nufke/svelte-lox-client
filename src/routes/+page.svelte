@@ -29,7 +29,7 @@
 		console.log('test: Token received:', token);
 
 		// disconnects and skips invalidation of token
-		console.info('test: Disconnect to miniserver...');
+		console.info('test: Disconnect miniserver...');
 		await client.disconnect(true);
 
 		// reconnect and use supplied token for auth instead of acquiring a new one

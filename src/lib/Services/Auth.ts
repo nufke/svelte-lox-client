@@ -1,7 +1,8 @@
-import TokenHandler from './TokenHandler.js';
-import WebSocketConnection from '../Services/WebSocketConnection.js';
+import TokenHandler from './TokenHandler';
+import WebSocketConnection from '../Services/WebSocketConnection';
 import { constants, publicEncrypt } from 'crypto';
-import CommandEncryption from './CommandEncryption.js';
+import CommandEncryption from './CommandEncryption';
+import Logger from '../Utils/Logger';
 
 class Auth {
 	private password: string;
@@ -16,15 +17,17 @@ class Auth {
 	userHashAlg: string | undefined;
 	userSalt: string | undefined;
 	commandEncryption: CommandEncryption;
+	log: Logger;
 
-	constructor(connection: WebSocketConnection, host: string, username: string, password: string, deviceId: string) {
+	constructor(log: Logger, connection: WebSocketConnection, host: string, username: string, password: string, deviceId: string) {
+		this.log = log;
 		this.connection = connection;
 		this.host = host;
 		this.username = username;
 		this.password = password;
 		this.deviceId = deviceId;
 
-		this.tokenHandler = new TokenHandler(this, this.connection, this.username, this.password, this.deviceId);
+		this.tokenHandler = new TokenHandler(this, this.log, this.connection, this.username, this.password, this.deviceId);
 		this.commandEncryption = new CommandEncryption(this);
 	}
 
@@ -61,7 +64,7 @@ class Auth {
 			await this.tokenHandler.acquireToken();
 		}
 
-		console.info('Authentication complete');
+		this.log.info('Authentication complete');
 	}
 
 	private async getPublicKey() {

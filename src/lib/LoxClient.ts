@@ -4,6 +4,8 @@ import Auth from './Services/Auth.js';
 import { LoxClientOptions } from './LoxClientOptions';
 import LoxClientState from './LoxClientState';
 import AutoReconnect from './Services/AutoReconnect';
+import Logger from './Utils/Logger';
+import { LogLevel } from './Utils/Logger';
 import TextMessage from './WebSocketMessages/TextMessage';
 import FileMessage from './WebSocketMessages/FileMessage';
 import LoxValueEvent from './LoxEvents/LoxValueEvent';
@@ -22,6 +24,7 @@ export class LoxClient extends EventTarget {
 	private readonly deviceId: string;
 	private autoReconnect: AutoReconnect;
 	private readonly COMMAND_TIMEOUT = 15000;
+	private readonly log: Logger;
 	private _state: LoxClientState = LoxClientState.disconnected;
 	private readonly uuidWatchlist = new Set<string>();
 	private isGen2 = false;
@@ -67,12 +70,13 @@ export class LoxClient extends EventTarget {
 		clientOptions: Partial<LoxClientOptions> | LoxClientOptions = new LoxClientOptions()
 	) {
 		super();
-		const options =	clientOptions instanceof LoxClientOptions	? clientOptions	: new LoxClientOptions(clientOptions);
+		const options = clientOptions instanceof LoxClientOptions ? clientOptions : new LoxClientOptions(clientOptions);
 		this.host = host;
 		this.deviceId = deviceId;
-		this.connection = new WebSocketConnection(this, this.host, this.COMMAND_TIMEOUT, options.messageLogEnabled);
-		this.auth = new Auth(this.connection, host, username, password, deviceId);
-		this.autoReconnect = new AutoReconnect(this, options.autoReconnectEnabled);
+		this.log = new Logger(options.logLevel);
+		this.connection = new WebSocketConnection(this, this.log, this.host, this.COMMAND_TIMEOUT, options.messageLogEnabled);
+		this.auth = new Auth(this.log, this.connection, host, username, password, deviceId);
+		this.autoReconnect = new AutoReconnect(this, this.log, options.autoReconnectEnabled);
 		this.options = options;
 
 		//this.rooms.set(UUID.empty.stringValue, new Room(UUID.empty, '<N/A>'));
@@ -83,7 +87,7 @@ export class LoxClient extends EventTarget {
 	 */
 	async connect(existingToken?: string) {
 		if (this._state !== LoxClientState.disconnected && this._state !== LoxClientState.error) {
-			console.warn('Not in disconnected or error state, ignoring connect call');
+			this.log.warn('Not in disconnected or error state, ignoring connect call');
 			return;
 		}
 		if (this.autoReconnect.autoReconnectingInProgress) {
@@ -101,14 +105,14 @@ export class LoxClient extends EventTarget {
 
 			// 3. create websocket connection and connect
 			await this.connection?.connect();
-			console.info(`Miniserver at ${this.host} connected`);
+			this.log.info(`Miniserver at ${this.host} connected`);
 			this.setState(LoxClientState.connected);
 
 			// 4. perform auth
 			this.setState(LoxClientState.authenticating);
 			await this.auth.authenticate(existingToken);
 			this.setState(LoxClientState.authenticated);
-			console.info('Authentication completed');
+			this.log.info('Authentication completed');
 			this.emit('authenticated');
 
 			// 5. enable keep-alive
@@ -116,12 +120,12 @@ export class LoxClient extends EventTarget {
 				this.connection?.enableKeepAlive();
 			}
 			this.setState(LoxClientState.ready);
-			console.info('LoxClient is ready to receive commands');
+			this.log.info('LoxClient is ready to receive commands');
 			this.emit('ready');
 
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} catch (error: any) {
-			console.error(`Could not connect: ${error.message} - ${error.cause}`, error);
+			this.log.error(`Could not connect: ${error.message} - ${error.cause}`, error);
 			this.setState(LoxClientState.error);
 			await this.autoReconnect.startAutoReconnect(existingToken);
 		}
@@ -135,13 +139,13 @@ export class LoxClient extends EventTarget {
 		try {
 			const structureFileMessage = await this.sendFileCommand('data/LoxAPP3.json');
 			this.structureFile = structureFileMessage.data;
-			console.info(
+			this.log.info(
 				`Received structure file with last modified: ${this.structureFile.lastModified}`
 			);
 			return this.structureFile;
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} catch (error: any) {
-			console.error(`Could not get structure file: ${error.message} - ${error.cause}`, error);
+			this.log.error(`Could not get structure file: ${error.message} - ${error.cause}`, error);
 			throw new Error('Could not get structure file', { cause: error as Error });
 		}
 	}
@@ -155,7 +159,7 @@ export class LoxClient extends EventTarget {
 			await this.connection.sendUnencryptedTextCommand('jdev/sps/enablebinstatusupdate');
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} catch (error: any) {
-			console.error(`Could not enable updates: ${error.message} - ${error.cause}`, error);
+			this.log.error(`Could not enable updates: ${error.message} - ${error.cause}`, error);
 			throw new Error('Could not enable updates', { cause: error as Error });
 		}
 	}
@@ -183,7 +187,7 @@ export class LoxClient extends EventTarget {
 			this.setState(LoxClientState.disconnected);
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} catch (error: any) {
-			console.error(`Error while disconnecting: ${error.message} - ${error.cause}`, error);
+			this.log.error(`Error while disconnecting: ${error.message} - ${error.cause}`, error);
 		}
 	}
 
@@ -196,7 +200,7 @@ export class LoxClient extends EventTarget {
 			await this.auth.tokenHandler.checkToken(token);
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} catch (error: any) {
-			console.error(`Could not check token: ${error.message} - ${error.cause}`, error);
+			this.log.error(`Could not check token: ${error.message} - ${error.cause}`, error);
 			throw new Error('Could not check token', { cause: error as Error });
 		}
 	}
@@ -210,7 +214,7 @@ export class LoxClient extends EventTarget {
 			await this.auth.tokenHandler.refreshToken();
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} catch (error: any) {
-			console.error(`Could not refresh token: ${error.message} - ${error.cause}`, error);
+			this.log.error(`Could not refresh token: ${error.message} - ${error.cause}`, error);
 			throw new Error('Could not refresh token', { cause: error as Error });
 		}
 	}
@@ -231,7 +235,7 @@ export class LoxClient extends EventTarget {
 			return await this.connection?.sendCommand(command, encrypted, timeoutOverride);
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} catch (error: any) {
-			console.error(
+			this.log.error(
 				`${command} - Could not send text command: ${error.message} - ${error.cause}`,
 				error
 			);
@@ -245,16 +249,13 @@ export class LoxClient extends EventTarget {
 	 * @param timeoutOverride (optional) timeoutoverride for this command
 	 * @returns The file contents as a FileMessage
 	 */
-	async sendFileCommand(
-		filename: string,
-		timeoutOverride = this.COMMAND_TIMEOUT
-	): Promise<FileMessage> {
+	async sendFileCommand(filename: string, timeoutOverride = this.COMMAND_TIMEOUT): Promise<FileMessage> {
 		try {
 			this.ensureReadyState('Not connected and authenticated, cannot send command');
 			return await this.connection?.sendUnencryptedFileCommand(filename, timeoutOverride);
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} catch (error: any) {
-			console.error(
+			this.log.error(
 				`${filename} - Could not send file command: ${error.message} - ${error.cause}`,
 				error
 			);
@@ -269,15 +270,11 @@ export class LoxClient extends EventTarget {
 	 * @param timeoutOverride (optional) timeoutoverride for this command
 	 * @returns The response from the Miniserver
 	 */
-	async control(
-		uuid: string,
-		command: string,
-		timeoutOverride = this.COMMAND_TIMEOUT
-	): Promise<TextMessage> {
+	async control(uuid: string, command: string, timeoutOverride = this.COMMAND_TIMEOUT): Promise<TextMessage> {
 		try {
 			this.ensureReadyState('Not connected and authenticated, cannot send command');
 			if (this.isStructureFileParsed && !this.controls.has(uuid)) {
-				console.warn(
+				this.log.warn(
 					`Control UUID '${uuid}' is not present in the structure file, control command will likely fail`
 				);
 			}
@@ -289,19 +286,19 @@ export class LoxClient extends EventTarget {
 				encrypted,
 				timeoutOverride
 			);
-			if (response.code === 404) console.error(`Miniserver control '${uuid}' not found`);
+			if (response.code === 404) this.log.error(`Miniserver control '${uuid}' not found`);
 			else if (response.code !== 200)
-				console.error(
+				this.log.error(
 					`${uuid}/${command} - unknown error, response was not 200 OK, but ${response.code}`
 				);
 			if (response.value === '0')
-				console.error(
+				this.log.error(
 					`Miniserver command '${command}' invalid, response indicates unsuccessful execution (response.value = 0)`
 				);
 			return response;
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} catch (error: any) {
-			console.error(
+			this.log.error(
 				`${uuid}/${command} - Could not execute control command: ${error.message} - ${error.cause}`,
 				error
 			);
@@ -317,19 +314,19 @@ export class LoxClient extends EventTarget {
 	 */
 	async parseStructureFile() {
 		if (!this.structureFile) {
-			console.warn(`No structure file loaded, trying to get it`);
+			this.log.warn(`No structure file loaded, trying to get it`);
 			await this.getStructureFile();
 		}
 
-		console.info(`Parsing structure file...`);
+		this.log.info(`Parsing structure file...`);
 
-		console.info(`Processing rooms...`);
+		this.log.info(`Processing rooms...`);
 		for (const uuid in this.structureFile.rooms) {
 			const room = this.structureFile.rooms[uuid];
-			console.debug(`Found room with UUID ${uuid}, name ${room.name}`);
+			this.log.debug(`Found room with UUID ${uuid}, name ${room.name}`);
 			this.rooms.set(uuid, new Room(UUID.fromString(uuid), room.name));
 		}
-		console.info(`Found ${this.rooms.size} rooms in the structure file.`);
+		this.log.info(`Found ${this.rooms.size} rooms in the structure file.`);
 
 		// create a map of potential event UUIDs to room and control names with state names
 		for (const controlUuidString in this.structureFile.controls) {
@@ -380,21 +377,29 @@ export class LoxClient extends EventTarget {
 				}
 			}
 		}
-		console.info(`Found ${this.controls.size} controls in the structure file.`);
-		console.info(`Found ${this.states.size} states in the structure file.`);
+		this.log.info(`Found ${this.controls.size} controls in the structure file.`);
+		this.log.info(`Found ${this.states.size} states in the structure file.`);
 		this.isStructureFileParsed = true;
+	}
+
+	/**
+	 * Sets the log level for the client.
+	 * @param level The log level to set
+	 */
+	setLogLevel(level: LogLevel) {
+		this.log.setLogLevel(level);
 	}
 
 	private registerEvents() {
 		if (this.eventsRegistered) return;
 
 		this.connection.on('disconnected', (reason: string) => {
-			console.warn(`Disconnected: ${reason}`);
+			this.log.warn(`Disconnected: ${reason}`);
 			if (this._state !== LoxClientState.error) this.setState(LoxClientState.disconnected);
 		});
 
 		this.connection.on('error', (error: Error) => {
-			console.error(`Connection error: ${error.message}`, error);
+			this.log.error(`Connection error: ${error.message}`, error);
 			this.setState(LoxClientState.error);
 		});
 
@@ -405,7 +410,7 @@ export class LoxClient extends EventTarget {
 					await this.autoReconnect.startAutoReconnect();
 					// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				} catch (error: any) {
-					console.error(`Failed to start auto reconnect: ${error?.message}`, error);
+					this.log.error(`Failed to start auto reconnect: ${error?.message}`, error);
 				}
 			});
 			this.connection.on('connected', async () => {
@@ -413,7 +418,7 @@ export class LoxClient extends EventTarget {
 					this.autoReconnect.stopAutoReconnect();
 					// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				} catch (error: any) {
-					console.error(`Failed to stop auto reconnect: ${error?.message}`, error);
+					this.log.error(`Failed to stop auto reconnect: ${error?.message}`, error);
 				}
 			});
 		}
@@ -458,7 +463,7 @@ export class LoxClient extends EventTarget {
 				}
 			}
 			if (this.options.messageLogEnabled && this.uuidWatchlist.size > 0) {
-				console.debug(`Event: ${event.toString()}`);
+				this.log.debug(`Event: ${event.toString()}`);
 			}
 			if (event instanceof LoxValueEvent) {
 				this.emit('event_value', event);
@@ -477,7 +482,7 @@ export class LoxClient extends EventTarget {
 		const ids = Array.isArray(uuid) ? uuid : [uuid];
 		for (const id of ids) {
 			if (this.isStructureFileParsed && !this.states.has(id)) {
-				console.warn(`UUID ${id} is not present in the structure file`);
+				this.log.warn(`UUID ${id} is not present in the structure file`);
 			}
 			this.uuidWatchlist.add(id);
 		}
@@ -510,7 +515,7 @@ export class LoxClient extends EventTarget {
 			throw new Error('Miniserver is rebooting');
 		}
 		if (!response.ok) {
-			console.error(`Failed to check version: ${response.status}`, response);
+			this.log.error(`Failed to check version: ${response.status}`, response);
 			throw new Error('Failed to check version');
 		}
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -537,7 +542,7 @@ export class LoxClient extends EventTarget {
 	private setState(state: LoxClientState) {
 		if (this._state !== state) {
 			this._state = state;
-			console.info(`State changed to: ${state}`);
+			this.log.info(`State changed to: ${state}`);
 			this.emit('stateChanged', state);
 		}
 	}
@@ -548,7 +553,10 @@ export class LoxClient extends EventTarget {
 		this.addEventListener(event as string, listener as (...args: any[]) => void);
 	}
 
-	emit<K extends keyof LoxClientEvents>(event: K, ...args: Parameters<LoxClientEvents[K]>): boolean {
+	emit<K extends keyof LoxClientEvents>(
+		event: K,
+		...args: Parameters<LoxClientEvents[K]>
+	): boolean {
 		return this.dispatchEvent(new CustomEvent(event, { detail: args[0] }));
 	}
 }

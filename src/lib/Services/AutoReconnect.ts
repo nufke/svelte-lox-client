@@ -1,3 +1,4 @@
+import Logger from '../Utils/Logger';
 import LoxClient from '../LoxClient';
 
 class AutoReconnect {
@@ -6,12 +7,14 @@ class AutoReconnect {
 	reconnectTimeout: NodeJS.Timeout | undefined;
 	// resolve function for the pending sleep so we can cancel it
 	client: LoxClient;
+	log: Logger;
 
 	reconnectResolve: undefined | ((value: boolean | PromiseLike<boolean>) => void);
 
-	constructor(client: LoxClient, autoReconnectEnabled: boolean) {
+	constructor(client: LoxClient, log: Logger, autoReconnectEnabled: boolean) {
 		this.autoReconnectEnabled = autoReconnectEnabled;
 		this.client = client;
+		this.log = log;
 	}
 
 	async startAutoReconnect(existingToken?: string) {
@@ -22,7 +25,7 @@ class AutoReconnect {
 
 		// run a cancelable loop that attempts to reconnect every 30s
 		while (this.autoReconnectEnabled && this.autoReconnectingInProgress) {
-			console.info('Waiting 30 seconds before reconnecting');
+			this.log.info('Waiting 30 seconds before reconnecting');
 
 			// allow aborting
 			const shouldReturn = await new Promise<boolean>((resolve) => {
@@ -35,12 +38,12 @@ class AutoReconnect {
 			});
 			if (shouldReturn) return;
 
-			console.info(`Reconnecting after disconnect...`);
+			this.log.info('Reconnecting after disconnect...');
 			try {
 				await this.client.connect(existingToken);
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			} catch (err: any) {
-				console.error(`Reconnect attempt failed: ${err?.message ?? err}`, err);
+				this.log.error(`Reconnect attempt failed: ${err?.message ?? err}`, err);
 			}
 		}
 	}
@@ -55,7 +58,7 @@ class AutoReconnect {
 
 		// if a sleep is pending, resolve it so the loop can exit promptly
 		if (this.reconnectResolve) {
-			console.info('Stopping pending reconnect');
+			this.log.info('Stopping pending reconnect');
 			try {
 				this.reconnectResolve(true);
 			} catch {

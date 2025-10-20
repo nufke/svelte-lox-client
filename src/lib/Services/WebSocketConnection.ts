@@ -8,6 +8,7 @@ import LoxTextEvent from '../LoxEvents/LoxTextEvent';
 import LoxValueEvent from '../LoxEvents/LoxValueEvent';
 import ParsedHeader from '../WebSocketMessages/ParsedHeader';
 import LoxClient from '../LoxClient';
+import Logger from '../Utils/Logger';
 import { maskEnc } from '../Utils/Masker';
 import { type WebSocketConnectionEvents } from './WebSocketConnectionEvents.js';
 
@@ -41,13 +42,15 @@ class WebSocketConnection extends EventTarget {
 	private KEEPALIVE_INTERVAL_MS = 15000;
 	private KEEPALIVE_COMMAND_TIMEOUT_MS = 5000;
 	private lastFilenameRequested = '';
+	private log: Logger;
 	private messageLog: boolean;
 
-	constructor(LoxClient: LoxClient, host: string, commandTimeout: number, messageLog: boolean) {
+	constructor(LoxClient: LoxClient, log: Logger, host: string, commandTimeout: number, messageLog: boolean) {
 		super();
 		this.LoxClient = LoxClient;
 		this.host = host;
 		this.COMMAND_TIMEOUT = commandTimeout;
+		this.log = log;
 		this.messageLog = messageLog;
 	}
 
@@ -86,7 +89,7 @@ class WebSocketConnection extends EventTarget {
 				await this.sendUnencryptedTextCommand('keepalive', this.KEEPALIVE_COMMAND_TIMEOUT_MS);
 				// if resolved, we'll get a keepalive header handled in handleMessage
 			} catch (err) {
-				console.error('Keepalive command failed or timed out, disconnecting', err);
+				this.log.error('Keepalive command failed or timed out, disconnecting', err);
 				// on error (including timeout) perform disconnect procedure
 				this.cleanupAfterDisconnectOrError('Keepalive command failed or timed out');
 			}
@@ -162,7 +165,7 @@ class WebSocketConnection extends EventTarget {
 					}
 				}
 
-				// console.debug(`  Received header with message type ${MessageType[header.messageType]}, estimated = ${header.isEstimated}`);
+				// this.log.debug(`  Received header with message type ${MessageType[header.messageType]}, estimated = ${header.isEstimated}`);
 
 				this.emit('header', header);
 				this.nextExpectedMessageType = header.getNextExpectedMessageType();
@@ -174,7 +177,7 @@ class WebSocketConnection extends EventTarget {
 				}
 				const textMessage = new TextMessage(message.data.toString());
 				if (this.messageLog) {
-					console.info(`Received text message: ${textMessage.toString()}`);
+					this.log.info(`Received text message: ${textMessage.toString()}`);
 				}
 				if (!textMessage.control) {
 					this.emit('text_message', textMessage);
@@ -201,7 +204,7 @@ class WebSocketConnection extends EventTarget {
 				const fileMessage = new FileMessage(message.data, isBinary, this.lastFilenameRequested);
 
 				if (this.messageLog) {
-					console.info(`Received file message: ${fileMessage.toString()}`);
+					this.log.info(`Received file message: ${fileMessage.toString()}`);
 				}
 				// Try to find a matching pending command by control
 				const idx = this.findCommandQueueEntryIndex(fileMessage.filename);
@@ -311,13 +314,13 @@ class WebSocketConnection extends EventTarget {
 			try {
 				if (commandDefinition.encryptedCommand) {
 					if (this.messageLog) {
-						console.info(`Sending encrypted command ${command} (${maskEnc(commandDefinition.encryptedCommand)})`);
+						this.log.info(`Sending encrypted command ${command} (${maskEnc(commandDefinition.encryptedCommand)})`);
 					}
 					this.ws?.send(commandDefinition.encryptedCommand);
 				} else {
 					if (command !== 'keepalive') {
 						if (this.messageLog) {
-							console.info(`Sending unencrypted command ${command}`);
+							this.log.info(`Sending unencrypted command ${command}`);
 						}
 					}
 					this.ws?.send(command);
