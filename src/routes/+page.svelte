@@ -1,5 +1,5 @@
 <script lang="ts">
-	import LoxClient from "$lib/LoxClient.js";
+	import LoxClient from '$lib/LoxClient';
 	import { page } from '$app/state';
 
 	async function test() {
@@ -11,12 +11,16 @@
 		let client = new LoxClient(host, username, password, deviceId);
 
 		// subscribe to basic events
-		client.on("disconnected", () => {
-			console.warn("test: Client disconnected");
+		client.on('connected', () => {
+			console.info('test: Client connected');
+		});
+
+		client.on('disconnected', () => {
+			console.info('test: Client disconnected');
 		});
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		client.on("error", (error: any) => {
+		client.on('error', (error: any) => {
 			console.error(`test: Client error: ${error.message}`, error);
 		});
 
@@ -26,7 +30,7 @@
 
 		// gets acquired token
 		const token = client.auth.tokenHandler.token;
-		console.log('test: Token received:', token);
+		console.info('test: Token received:', token);
 
 		// disconnects and skips invalidation of token
 		console.info('test: Disconnect miniserver...');
@@ -62,9 +66,21 @@
 			console.info('test: Received value event', detail);
 		});
 
+		client.on("event_text", (event: any) => {
+			let detail = {
+				uuid: event.detail.uuid.stringValue,
+				stateName: event.detail.state?.name,
+				value: event.detail.text,
+				roomName: event.detail.state?.parentControl?.room?.name,
+				controlName: event.detail.state?.parentControl?.name,
+				eventPath: event.detail.toPath(),
+			}
+			console.info('test: Received text event', detail);
+		});
+
 		// disconnects and kills token
 		setTimeout( async() => {
-  		console.log("test: Disconnect client after 5 seconds...");
+  		console.info('test: Disconnect client after 5 seconds...');
 			await client.disconnect();
 		}, 5000);
 
