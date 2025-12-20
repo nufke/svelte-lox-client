@@ -15,9 +15,9 @@ class TextMessage {
 			this.type = 'json';
 			this.data = this.json;
 			if (this.json.LL) {
-				if (this.json.LL.code || this.json.LL.Code)
+				if (this.json.LL.code || this.json.LL.Code) {
 					this.code = parseInt(this.json.LL.Code ?? this.json.LL.code);
-
+				}
 				if (this.json.LL.control) {
 					this.type = 'control';
 					this.control = this.json.LL.control;

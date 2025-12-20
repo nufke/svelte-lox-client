@@ -7,7 +7,9 @@ export function maskProperties(input: string, maskedProperties: string[]): strin
 }
 
 export function maskEnc(input: string | undefined): string | undefined {
-	if (!input) return input;
+	if (!input) {
+		return input;
+	}
 	const pattern = new RegExp(`(jdev/sys/enc/)(.{8})(.*)`, 'g');
 	input = input.replace(pattern, '$1$2...');
 	return input;

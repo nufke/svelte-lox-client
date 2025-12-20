@@ -1,5 +1,6 @@
 /**
  * Basic logger class using the console, since this is a client app running in a browser
+ *  @param logLevel log level for the Logger (see LogLevel for details)
  */
 class Logger {
 	private logLevel: LogLevel;
@@ -45,11 +46,16 @@ export default Logger;
 
 /**
  * LogLevel enumeration to specify the logging level
+ *  DEBUG: shows debug, info, warn, error
+ *  INFO : shows info, warn, error
+ *  WARN : shows warn, error
+ *  ERROR: shows error
+ *  NONE : no logging
  */
 export const enum LogLevel {
-	NONE = 0,
-	DEBUG = 1,
-	INFO = 2,
-	WARN = 3,
-	ERROR = 4
+	DEBUG = 4,
+	INFO = 3,
+	WARN = 2,
+	ERROR = 1,
+	NONE = 0
 }

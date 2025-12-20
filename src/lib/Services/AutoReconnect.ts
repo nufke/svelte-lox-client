@@ -36,7 +36,9 @@ class AutoReconnect {
 					resolve(false);
 				}, 30000);
 			});
-			if (shouldReturn) return;
+			if (shouldReturn) {
+				return;
+			}
 
 			this.log.info('Reconnecting after disconnect...');
 			try {

@@ -45,15 +45,17 @@ class TokenHandler {
 			return;
 		}
 
-		// 1. Acquire new “key”, “salt” & “hashAlg” at once using “jdev/sys/getkey2/{user}”
+		// 1. Acquire new key, salt & hashAlg at once using /jdev/sys/getkey2/{user}
 		await this.auth.getUserKey();
 
-		if (!this.auth.userKey) throw new Error('User key is missing');
+		if (!this.auth.userKey) {
+			throw new Error('User key is missing');
+		}
 
 		// 2. hash token
 		const tokenHash = hmacHash(this.token, this.auth.userKey);
 
-		// 3. Request a JSON Web Token “jdev/sys/refreshjwt/{tokenHash}/{this.username}”
+		// 3. Request a JSON Web Token using /jdev/sys/refreshjwt/{tokenHash}/{this.username}
 		const refreshTokenCommand = `jdev/sys/refreshjwt/${tokenHash}/${this.username}`;
 		const refreshTokenResponse = await this.connection.sendEncryptedTextCommand(refreshTokenCommand);
 
@@ -63,9 +65,11 @@ class TokenHandler {
 	}
 
 	async acquireToken() {
-		// 1. Acquire the “key”, “salt” & “hashAlg” at once using “jdev/sys/getkey2/{user}”
+		// 1. Acquire the key, salt & hashAlg at once using /jdev/sys/getkey2/{user}
 		await this.auth.getUserKey();
-		if (!this.auth.userKey) throw new Error('User key is missing');
+		if (!this.auth.userKey) {
+			throw new Error('User key is missing');
+		}
 
 		// 2. Hash the password including the user specific salt
 		const pwdHashPayload = `${this.password}:${this.auth.userSalt}`;
@@ -75,8 +79,10 @@ class TokenHandler {
 		const userHashPayload = `${this.username}:${pwdHash}`;
 		const userHash = hmacHash(userHashPayload, this.auth.userKey);
 
-		// 4. Request a JSON Web Token "jdev/sys/getjwt/{hash}/{user}/{permission}/{uuid}/{info}"
-		if (!this.deviceId) throw new Error('Device ID is missing');
+		// 4. Request a JSON Web Token using /jdev/sys/getjwt/{hash}/{user}/{permission}/{uuid}/{info}
+		if (!this.deviceId) {
+			throw new Error('Device ID is missing');
+		}
 
 		const permission = 4; // permission for long lived token, used for Apps
 		const info = `svelte-lox-client-${this.username}`; // client description
@@ -102,9 +108,10 @@ class TokenHandler {
 		if (!tokenTocheck) return;
 
 		await this.auth.getUserKey();
-		if (!this.auth.userKey) throw new Error('User key is missing');
+		if (!this.auth.userKey) {
+			throw new Error('User key is missing');
+		}
 		const tokenHash = hmacHash(tokenTocheck, this.auth.userKey);
-
 		const checkTokenCommand = `jdev/sys/checktoken/${tokenHash}/${this.username}`;
 		const checkTokenResponse = await this.connection.sendEncryptedTextCommand(checkTokenCommand);
 		if (checkTokenResponse.code !== 200) {
@@ -115,9 +122,13 @@ class TokenHandler {
 	}
 
 	async authenticateWithToken(token: string) {
-		if (!token) return;
+		if (!token) {
+			return;
+		}
 		await this.auth.getUserKey();
-		if (!this.auth.userKey) throw new Error('User key is missing');
+		if (!this.auth.userKey) {
+			throw new Error('User key is missing');
+		}
 		const tokenHash = hmacHash(token, this.auth.userKey);
 
 		const authWithTokenCommand = `authwithtoken/${tokenHash}/${this.username}`;
@@ -134,7 +145,9 @@ class TokenHandler {
 	async killToken() {
 		if (this.token) {
 			await this.auth.getUserKey();
-			if (!this.auth.userKey) throw new Error('User key is missing');
+			if (!this.auth.userKey) {
+				throw new Error('User key is missing');
+			}
 
 			const tokenHash = hmacHash(this.token, this.auth.userKey);
 			const killTokenCommand = `jdev/sys/killtoken/${tokenHash}/${this.username}`;
@@ -151,7 +164,9 @@ class TokenHandler {
 
 	private processTokenResponse(tokenResponse: TextMessage) {
 		this.validUntil = tokenResponse.value.validUntil;
-		if (!this.validUntil) throw new Error('Token validUntil is missing');
+		if (!this.validUntil) {
+			throw new Error('Token validUntil is missing');
+		}
 		const seconds = parseInt(this.validUntil);
 		const baseMs = Date.UTC(2009, 0, 1, 0, 0, 0);
 		this.validUntilDateUTC = new Date(baseMs + seconds * 1000);

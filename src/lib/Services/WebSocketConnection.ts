@@ -77,12 +77,16 @@ class WebSocketConnection extends EventTarget {
 	}
 
 	enableKeepAlive() {
-		if (this.keepAliveEnabled) return;
+		if (this.keepAliveEnabled) {
+			return;
+		}
 		this.keepAliveEnabled = true;
 
 		// send keepalive periodically; rely on sendUnencryptedTextCommand to reject on timeout
 		this.keepAliveInterval = setInterval(async () => {
-			if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+			if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+				return;
+			}
 
 			try {
 				// send unencrypted keepalive and wait for response or timeout
@@ -165,7 +169,7 @@ class WebSocketConnection extends EventTarget {
 					}
 				}
 
-				// this.log.debug(`  Received header with message type ${MessageType[header.messageType]}, estimated = ${header.isEstimated}`);
+				this.log.debug(`  Received header with message type ${MessageType[header.messageType]}, estimated = ${header.isEstimated}`);
 
 				this.emit('header', header);
 				this.nextExpectedMessageType = header.getNextExpectedMessageType();

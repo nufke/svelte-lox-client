@@ -277,11 +277,14 @@ export class LoxClient extends EventTarget {
 			const encrypted = !this.isGen2;
 			const fullCommand = `jdev/sps/io/${uuid}/${command}`;
 			const response = await this.connection.sendCommand<TextMessage>(fullCommand, encrypted, timeoutOverride);
-			if (response.code === 404) this.log.error(`Miniserver control '${uuid}' not found`);
-			else if (response.code !== 200)
+			if (response.code === 404) {
+				this.log.error(`Miniserver control '${uuid}' not found`);
+			}	else if (response.code !== 200) {
 				this.log.error(`${uuid}/${command} - unknown error, response was not 200 OK, but ${response.code}`);
-			if (response.value === '0')
+			}
+			if (response.value === '0') {
 				this.log.error(`Miniserver command '${command}' invalid, response indicates unsuccessful execution (response.value = 0)`);
+			}
 			return response;
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} catch (error: any) {
@@ -315,7 +318,9 @@ export class LoxClient extends EventTarget {
 		// create a map of potential event UUIDs to room and control names with state names
 		for (const controlUuidString in this.structureFile.controls) {
 			const controlSection = this.structureFile.controls[controlUuidString];
-			if (!controlSection.type || controlSection.type === 'SystemScheme') continue;
+			if (!controlSection.type || controlSection.type === 'SystemScheme') {
+				continue;
+			}
 			// lookup room
 			let room;
 			if (!controlSection.room) {
@@ -323,7 +328,9 @@ export class LoxClient extends EventTarget {
 			} else {
 				room = this.rooms.get(controlSection.room);
 			}
-			if (!room) throw new Error(`Could not find room with UUID ${controlSection.room}`);
+			if (!room) {
+				throw new Error(`Could not find room with UUID ${controlSection.room}`);
+			}
 			// create control
 			const control = new Control(controlUuidString, controlSection, room);
 			this.controls.set(controlUuidString, control);
@@ -375,11 +382,15 @@ export class LoxClient extends EventTarget {
 	}
 
 	private registerEvents() {
-		if (this.eventsRegistered) return;
+		if (this.eventsRegistered) {
+			return;
+		}
 
 		this.connection.on('disconnected', (reason: string) => {
 			this.log.warn(`Disconnected: ${reason}`);
-			if (this._state !== LoxClientState.error) this.setState(LoxClientState.disconnected);
+			if (this._state !== LoxClientState.error) {
+				this.setState(LoxClientState.disconnected);
+			}
 		});
 
 		this.connection.on('error', (error: Error) => {
@@ -482,7 +493,9 @@ export class LoxClient extends EventTarget {
 	}
 
 	private enrichEvent<T extends LoxEnrichableEvent>(event: T): T {
-		if (!this.isStructureFileParsed) return event;
+		if (!this.isStructureFileParsed) {
+			return event;
+		}
 
 		const state = this.states.get(event.uuid.stringValue);
 		if (!state) {

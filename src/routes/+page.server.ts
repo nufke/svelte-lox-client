@@ -1,6 +1,6 @@
 import { env } from '$env/dynamic/private'
 
 export async function load() {
-	const data = { ...env };
+	const data = { ...env }; // TODO not secure !!!
   return data;
 }

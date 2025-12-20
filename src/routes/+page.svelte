@@ -1,6 +1,7 @@
 <script lang="ts">
 	import LoxClient from '$lib/LoxClient';
 	import { page } from '$app/state';
+	import { LogLevel } from '$lib/Utils/Logger';
 
 	async function test() {
 		// instantiate the client
@@ -8,7 +9,7 @@
 		const username = page.data.MS_USERNAME;
 		const password = page.data.MS_PASSWORD;
 		const deviceId = page.data.APP_ID;
-		let client = new LoxClient(host, username, password, deviceId);
+		let client = new LoxClient(host, username, password, deviceId, {logLevel: LogLevel.DEBUG});
 
 		// subscribe to basic events
 		client.on('connected', () => {
@@ -36,8 +37,11 @@
 		console.info('test: Disconnect miniserver...');
 		await client.disconnect(true);
 
-		// reconnect and use supplied token for auth instead of acquiring a new one
-		console.info('test: Connect to miniserver...');
+		// reconnect websocket and use supplied token for auth instead of acquiring a new one
+		// since we use the token, we keep the password empty. Due to this, token renewal
+		// cannot be 
+		console.info('test: Connect to miniserver using token...');
+		client = new LoxClient(host, username, '', deviceId);
 		await client.connect(token);
 
 		// get structure file
@@ -79,8 +83,8 @@
 		});
 
 		// disconnects and kills token
+ 		console.info('test: Disconnect client after 5 seconds...');
 		setTimeout( async() => {
-  		console.info('test: Disconnect client after 5 seconds...');
 			await client.disconnect();
 		}, 5000);
 
