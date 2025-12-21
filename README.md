@@ -6,9 +6,10 @@ This library aims to use the Web APIs supported by browsers and only imports a l
 This library is used in the [LoxBuddy App](https://github.com/nufke/loxbuddy/) to establish a 
 WebSocket connection to the Miniserver.
 
-## Issues and questions
+## Issues, questions and requests
 
-Please submit your issues and questions via the GitHub issue tracker: https://github.com/nufke/svelte-lox-client/issues
+Please submit your issues and questions via the GitHub [issue tracker](https://github.com/nufke/svelte-lox-client/issues).
+or submit a [Pull Request](https://github.com/nufke/svelte-lox-client/pulls).
 
 ## Credits and acknowledgements
 

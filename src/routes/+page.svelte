@@ -1,15 +1,24 @@
 <script lang="ts">
 	import LoxClient from '$lib/LoxClient';
-	import { page } from '$app/state';
 	import { LogLevel } from '$lib/Utils/Logger';
 
-	async function test() {
+	let hostname: string = '';
+	let username: string = '';
+	let password: string = '';
+	let deviceId: string = '1234';
+	let client: LoxClient;
+
+	function validate() {
+		if(hostname.length && username.length && password.length) {
+			connect();
+		} else {
+			console.log('some fields are empty');
+		}
+	}
+
+	async function connect() {
 		// instantiate the client
-		const host = page.data.MS_HOST;
-		const username = page.data.MS_USERNAME;
-		const password = page.data.MS_PASSWORD;
-		const deviceId = page.data.APP_ID;
-		let client = new LoxClient(host, username, password, deviceId, {logLevel: LogLevel.DEBUG});
+		client = new LoxClient(hostname, username, password, deviceId, {logLevel: LogLevel.DEBUG});
 
 		// subscribe to basic events
 		client.on('connected', () => {
@@ -41,7 +50,7 @@
 		// since we use the token, we keep the password empty. Due to this, token renewal
 		// cannot be 
 		console.info('test: Connect to miniserver using token...');
-		client = new LoxClient(host, username, '', deviceId);
+		client = new LoxClient(hostname, username, '', deviceId);
 		await client.connect(token);
 
 		// get structure file
@@ -51,7 +60,7 @@
 
 		// initiates streaming of events
 		console.info('test: Enable updates...');
-		await client.enableUpdates();
+		//await client.enableUpdates();
 
 		// sets a switch to on
 		//await client.control("90f7abe3-8772-476d-b1dd-a5c1c4cf1ed9", "on");
@@ -87,10 +96,36 @@
 		setTimeout( async() => {
 			await client.disconnect();
 		}, 5000);
-
+	}
+	
+	async function disconnect() {
+		console.info('test: Disconnect client...');
+		await client.disconnect();
 	}
 
-	test();
 </script>
 
-<p>Check console / DevTools for the results</p>
+<p><b>TEST: Connect to Loxone Miniserver using WebSocket</b></p>
+<form onsubmit={validate}>
+	<fieldset>
+		<label>
+			<span>IP address:port</span>
+			<input type="text" bind:value={hostname} placeholder="IP address" />
+		</label>
+		<br>
+		<label>
+			<span>Username</span>
+			<input class="input" type="text" bind:value={username} placeholder="Username" />
+		</label>
+		<br>
+		<label>
+			<span>Password</span>
+			<input class="input" type="password" bind:value={password} placeholder="Password" />
+		</label>
+	</fieldset>
+	<fieldset>
+		<button type="submit">Connect</button>
+	</fieldset>
+</form>
+<button type="button" onclick={disconnect}>Disconnect</button>
+<p><i>Check console / DevTools for connection details</i></p>

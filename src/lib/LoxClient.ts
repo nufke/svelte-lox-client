@@ -386,8 +386,8 @@ export class LoxClient extends EventTarget {
 			return;
 		}
 
-		this.connection.on('disconnected', (reason: string) => {
-			this.log.warn(`Disconnected: ${reason}`);
+		this.connection.on('disconnected', (reason) => {
+			this.log.warn(`Disconnected: ${JSON.stringify(reason)}`);
 			if (this._state !== LoxClientState.error) {
 				this.setState(LoxClientState.disconnected);
 			}
@@ -399,8 +399,8 @@ export class LoxClient extends EventTarget {
 		});
 
 		if (this.autoReconnect.autoReconnectEnabled) {
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			this.connection.on('disconnected', async (reason: string) => {
+			 
+			this.connection.on('disconnected', async () => {
 				try {
 					await this.autoReconnect.startAutoReconnect();
 					// eslint-disable-next-line @typescript-eslint/no-explicit-any

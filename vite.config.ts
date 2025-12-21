@@ -6,18 +6,18 @@ export default defineConfig({
 	plugins: [
 		sveltekit(),
 		nodePolyfills({
+      include: [
+        'buffer',
+        'crypto',
+        'stream',
+        'util',
+        'vm'
+      ],
       globals: {
         Buffer: true,
         global: true,
         process: true,
-      },
-      protocolImports: true,
-    }),
-	],
-	resolve: {
-    alias: {
-      crypto: 'crypto-browserify',
-			buffer: 'buffer/',
-		}
-	}
+      }
+    })
+	]
 });

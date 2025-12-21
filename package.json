@@ -60,8 +60,6 @@
 		"svelte, websocket"
 	],
 	"dependencies": {
-		"buffer": "^6.0.3",
-		"crypto-browserify": "^3.12.1",
 		"vite-plugin-node-polyfills": "^0.24.0"
 	}
 }

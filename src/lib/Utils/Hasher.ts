@@ -1,4 +1,4 @@
-import { createHash, createHmac } from 'crypto'; /* note, for browser usage this becomes an alias to crypto-browserify */
+import { createHash, createHmac } from 'crypto';
 
 export function hash(payload: string, algorithm = 'sha256'): string {
 	const hasher = createHash(algorithm);
