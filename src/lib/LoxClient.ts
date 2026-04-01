@@ -66,7 +66,11 @@ export class LoxClient extends EventTarget {
 	 * @param deviceId Unique device/app ID
 	 * @param clientOptions options
 	 */
-	constructor(host: string, username: string, password: string, deviceId: string,
+	constructor(
+		host: string,
+		username: string,
+		password: string,
+		deviceId: string,
 		clientOptions: Partial<LoxClientOptions> | LoxClientOptions = new LoxClientOptions()
 	) {
 		super();
@@ -507,7 +511,8 @@ export class LoxClient extends EventTarget {
 	}
 
 	private async checkVersion() {
-		const response = await fetch('http://' + this.host + '/jdev/cfg/apiKey');
+		this.log.info('Checking Miniserver version...');
+		const response = await fetch(`${this.host}/jdev/cfg/apiKey`);
 		if (response.status === 503) {
 			throw new Error('Miniserver is rebooting');
 		}
@@ -520,6 +525,7 @@ export class LoxClient extends EventTarget {
 		const jsonString = data.LL.value.replace(/'/g, '"');
 		const dataJson = JSON.parse(jsonString);
 		const version = dataJson.version;
+		this.log.info(`Miniserver version is ${version}`);
 		const versionParts = version.split('.');
 		if (versionParts[0] < 11 || (versionParts[0] === 11 && versionParts[1] < 2)) {
 			throw new Error(`Unsupported firmware version, needs to be at least 11.2: ${version}`);

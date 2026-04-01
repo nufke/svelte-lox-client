@@ -7,7 +7,7 @@ enum LoxClientState {
 	authenticated = 'authenticated',
 	ready = 'ready',
 	reconnecting = 'reconnecting',
-	error = 'error',
+	error = 'error'
 }
 
 export default LoxClientState;

@@ -55,18 +55,26 @@ class WebSocketConnection extends EventTarget {
 	}
 
 	async connect() {
-		this.ws = new WebSocket(`ws://${this.host}/ws/rfc6455`);
-		this.ws.binaryType = 'arraybuffer'; /* for binary data get ArrayBuffer instead of Blob */
+		const found = this.host.match(/(.*\/\/)?(.*)/);
+		const protocol = found && found[1].includes('https') ? 'wss' : 'ws';
+		const url = found && found[2] ? `${protocol}://${found[2]}/ws/rfc6455` : null;
 
-		this.ws.addEventListener('open', () => {
+		if (url) {
+			this.ws = new WebSocket(url, 'remotecontrol');
+			this.ws.binaryType = 'arraybuffer'; /* for binary data get ArrayBuffer instead of Blob */
+		} else {
+			this.log.error('Invalid Miniserver hostname');
+		}
+
+		this.ws?.addEventListener('open', () => {
 			this.emit('connected');
 		});
 
-		this.ws.addEventListener('close', this.cleanupAfterDisconnectOrError);
-		this.ws.addEventListener('error', this.cleanupAfterDisconnectOrError);
+		this.ws?.addEventListener('close', this.cleanupAfterDisconnectOrError);
+		this.ws?.addEventListener('error', this.cleanupAfterDisconnectOrError);
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		this.ws.addEventListener('message', (message: any) => {
+		this.ws?.addEventListener('message', (message: any) => {
 			this.handleMessage(message);
 		});
 

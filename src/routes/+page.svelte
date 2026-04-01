@@ -5,7 +5,7 @@
 	let hostname: string = '';
 	let username: string = '';
 	let password: string = '';
-	let deviceId: string = '1234';
+	let deviceId: string = '1234'; // dummy App ID
 	let client: LoxClient;
 
 	function validate() {
@@ -35,23 +35,15 @@
 		});
 
 		// initiate connection
-		console.info('test: Client connecting to miniserver...');
+		console.info('test: Client connecting to Miniserver...');
 		await client.connect();
+
+		// check client state
+		console.info('test: Client state:', client.state);
 
 		// gets acquired token
 		const token = client.auth.tokenHandler.token;
 		console.info('test: Token received:', token);
-
-		// disconnects and skips invalidation of token
-		console.info('test: Disconnect miniserver...');
-		await client.disconnect(true);
-
-		// reconnect websocket and use supplied token for auth instead of acquiring a new one
-		// since we use the token, we keep the password empty. Due to this, token renewal
-		// cannot be 
-		console.info('test: Connect to miniserver using token...');
-		client = new LoxClient(hostname, username, '', deviceId);
-		await client.connect(token);
 
 		// get structure file
 		console.info('test: Get structure file...');
@@ -59,7 +51,7 @@
 		client.parseStructureFile();
 
 		// initiates streaming of events
-		console.info('test: Enable updates...');
+		//console.info('test: Enable updates...');
 		//await client.enableUpdates();
 
 		// sets a switch to on
@@ -115,12 +107,12 @@
 		<br>
 		<label>
 			<span>Username</span>
-			<input class="input" type="text" bind:value={username} placeholder="Username" />
+			<input class="input" type="text" bind:value={username} placeholder="Username" autocomplete="" />
 		</label>
 		<br>
 		<label>
 			<span>Password</span>
-			<input class="input" type="password" bind:value={password} placeholder="Password" />
+			<input class="input" type="password" bind:value={password} placeholder="Password" autocomplete="" />
 		</label>
 	</fieldset>
 	<fieldset>

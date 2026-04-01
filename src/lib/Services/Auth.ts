@@ -68,7 +68,8 @@ class Auth {
 	}
 
 	private async getPublicKey() {
-		const response = await fetch('http://' + this.host + '/jdev/sys/getcertificate');
+		const url = `${this.host}/jdev/sys/getcertificate`;
+		const response = await fetch(url);
 		this.parsePublicKey(await response.text());
 	}
 
