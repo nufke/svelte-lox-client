@@ -20,7 +20,7 @@ import UUID from './WebSocketMessages/UUID';
 export class LoxClient extends EventTarget {
 	private readonly connection: WebSocketConnection;
 	readonly auth: Auth;
-	private readonly host: string;
+	private readonly hostName: string;
 	private readonly deviceId: string;
 	private autoReconnect: AutoReconnect;
 	private readonly COMMAND_TIMEOUT = 15000;
@@ -60,30 +60,28 @@ export class LoxClient extends EventTarget {
 
 	/**
 	 * Class to establish communication with Miniserver
-	 * @param host Loxone hostname or IP
-	 * @param username Username to be used
+	 * @param hostName Hostname or IP and port (incl http(s))
+	 * @param userName Username to be used
 	 * @param password Password for the user
 	 * @param deviceId Unique device/app ID
 	 * @param clientOptions options
 	 */
 	constructor(
-		host: string,
-		username: string,
+		hostName: string,
+		userName: string,
 		password: string,
 		deviceId: string,
 		clientOptions: Partial<LoxClientOptions> | LoxClientOptions = new LoxClientOptions()
 	) {
 		super();
 		const options = clientOptions instanceof LoxClientOptions ? clientOptions : new LoxClientOptions(clientOptions);
-		this.host = host;
+		this.hostName = hostName.replace(/\/$/, '');
 		this.deviceId = deviceId;
 		this.log = new Logger(options.logLevel);
-		this.connection = new WebSocketConnection(this, this.log, this.host, this.COMMAND_TIMEOUT, options.messageLogEnabled);
-		this.auth = new Auth(this.log, this.connection, host, username, password, deviceId);
+		this.connection = new WebSocketConnection(this, this.log, this.hostName, this.COMMAND_TIMEOUT, options.messageLogEnabled);
+		this.auth = new Auth(this.log, this.connection, this.hostName, userName, password, deviceId);
 		this.autoReconnect = new AutoReconnect(this, this.log, options.autoReconnectEnabled);
 		this.options = options;
-
-		//this.rooms.set(UUID.empty.stringValue, new Room(UUID.empty, '<N/A>'));
 	}
 
 	/**
@@ -109,7 +107,7 @@ export class LoxClient extends EventTarget {
 
 			// 3. create websocket connection and connect
 			await this.connection?.connect();
-			this.log.info(`Miniserver at ${this.host} connected`);
+			this.log.info(`Miniserver at ${this.hostName} connected`);
 			this.setState(LoxClientState.connected);
 
 			// 4. perform auth
@@ -512,7 +510,7 @@ export class LoxClient extends EventTarget {
 
 	private async checkVersion() {
 		this.log.info('Checking Miniserver version...');
-		const response = await fetch(`${this.host}/jdev/cfg/apiKey`);
+		const response = await fetch(`${this.hostName}/jdev/cfg/apiKey`);
 		if (response.status === 503) {
 			throw new Error('Miniserver is rebooting');
 		}

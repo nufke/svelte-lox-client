@@ -2,23 +2,23 @@
 	import LoxClient from '$lib/LoxClient';
 	import { LogLevel } from '$lib/Utils/Logger';
 
-	let hostname: string = '';
-	let username: string = '';
+	let hostName: string = '';
+	let userName: string = '';
 	let password: string = '';
 	let deviceId: string = '1234'; // dummy App ID
 	let client: LoxClient;
 
 	function validate() {
-		if(hostname.length && username.length && password.length) {
+		if(hostName.length && userName.length && password.length) {
 			connect();
 		} else {
-			console.log('some fields are empty');
+			console.error('Some fields are empty');
 		}
 	}
 
 	async function connect() {
 		// instantiate the client
-		client = new LoxClient(hostname, username, password, deviceId, {logLevel: LogLevel.DEBUG});
+		client = new LoxClient(hostName, userName, password, deviceId, {logLevel: LogLevel.DEBUG});
 
 		// subscribe to basic events
 		client.on('connected', () => {
@@ -92,7 +92,9 @@
 	
 	async function disconnect() {
 		console.info('test: Disconnect client...');
-		await client.disconnect();
+		if (client) {
+			await client.disconnect();
+		}
 	}
 
 </script>
@@ -102,12 +104,12 @@
 	<fieldset>
 		<label>
 			<span>IP address:port</span>
-			<input type="text" bind:value={hostname} placeholder="IP address" />
+			<input type="text" bind:value={hostName} placeholder="IP address" />
 		</label>
 		<br>
 		<label>
 			<span>Username</span>
-			<input class="input" type="text" bind:value={username} placeholder="Username" autocomplete="" />
+			<input class="input" type="text" bind:value={userName} placeholder="Username" autocomplete="" />
 		</label>
 		<br>
 		<label>
