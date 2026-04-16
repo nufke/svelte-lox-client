@@ -326,7 +326,7 @@ export class LoxClient extends EventTarget {
 			// lookup room
 			let room;
 			if (!controlSection.room) {
-				room = this.rooms.get(UUID.empty.stringValue);
+				room = this.rooms.values().next().value; // first entry assumed 'Not assigned'
 			} else {
 				room = this.rooms.get(controlSection.room);
 			}
