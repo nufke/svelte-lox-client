@@ -323,10 +323,11 @@ export class LoxClient extends EventTarget {
 			if (!controlSection.type || controlSection.type === 'SystemScheme') {
 				continue;
 			}
-			// lookup room
+			// lookup room, and if not found, fallback on unassigned (first) roon
 			let room;
-			if (!controlSection.room) {
-				room = this.rooms.values().next().value; // first entry assumed 'Not assigned'
+			if (!controlSection.room || !this.rooms.has(controlSection.room)) {
+				this.log.error(`Could not find room for control '${controlSection.name}'. Fallback to room '${this.rooms.values().next().value?.name}'`);
+				room = this.rooms.values().next().value;
 			} else {
 				room = this.rooms.get(controlSection.room);
 			}
