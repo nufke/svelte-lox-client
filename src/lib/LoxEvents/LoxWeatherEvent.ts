@@ -1,7 +1,7 @@
 import UUID from '../WebSocketMessages/UUID';
-import { LoxEvent } from './LoxEvent';
+import LoxEnrichableEvent from './LoxEnrichableEvent';
 
-class LoxWeatherEvent extends LoxEvent {
+class LoxWeatherEvent extends LoxEnrichableEvent {
 	typeName = LoxWeatherEvent.name;
 	lastUpdate: number;
 	entries: number;
@@ -33,17 +33,17 @@ class LoxWeatherEvent extends LoxEvent {
 
 		for (let i = 0; i < this.entries; i++) {
 			this.entry.push({
-				'timestamp': binaryData.readInt32LE(offset_add),
-				'weatherType': binaryData.readInt32LE(offset_add + 4),
-				'windDirection': binaryData.readInt32LE(offset_add + 8),
-				'solarRadiation': binaryData.readInt32LE(offset_add + 12),
-				'relativeHumidity': binaryData.readInt32LE(offset_add + 16),
-				'temperature': binaryData.readDoubleLE(offset_add + 20),
-				'perceivedTemperature': binaryData.readDoubleLE(offset_add + 28),
-				'dewPoint': binaryData.readDoubleLE(offset_add + 36),
-				'precipitation': binaryData.readDoubleLE(offset_add + 44),
-				'windSpeed': binaryData.readDoubleLE(offset_add + 52),
-				'barometricPressure': binaryData.readDoubleLE(offset_add + 60),
+				timestamp: binaryData.readInt32LE(offset_add),
+				weatherType: binaryData.readInt32LE(offset_add + 4),
+				windDirection: binaryData.readInt32LE(offset_add + 8),
+				solarRadiation: binaryData.readInt32LE(offset_add + 12),
+				relativeHumidity: binaryData.readInt32LE(offset_add + 16),
+				temperature: binaryData.readDoubleLE(offset_add + 20),
+				perceivedTemperature: binaryData.readDoubleLE(offset_add + 28),
+				dewPoint: binaryData.readDoubleLE(offset_add + 36),
+				precipitation: binaryData.readDoubleLE(offset_add + 44),
+				windSpeed: binaryData.readDoubleLE(offset_add + 52),
+				barometricPressure: binaryData.readDoubleLE(offset_add + 60)
 			});
 			offset_add += 68;
 		}
@@ -55,6 +55,27 @@ class LoxWeatherEvent extends LoxEvent {
 
 	override toPath(): string {
 		return this.uuid.stringValue;
+	}
+
+	override toString(): string {
+		let str = '{lastUpdate: ' + this.lastUpdate + ', entries: ' + this.entries + ', entry: [\n';
+		for (let i = 0; i < this.entries; i++) {
+			const entry = this.entry[i];
+			str += '{timestamp: ' + entry.timestamp;
+			str += ', weatherType: ' + entry.weatherType;
+			str += ', windDirection: ' + entry.windDirection;
+			str += ', solarRadiation: ' + entry.solarRadiation;
+			str += ', relativeHumidity: ' + entry.relativeHumidity;
+			str += ', temperature: ' + entry.temperature;
+			str += ', perceivedTemperature: ' + entry.perceivedTemperature;
+			str += ', dewPoint: ' + entry.dewPoint;
+			str += ', precipitation: ' + entry.precipitation;
+			str += ', windSpeed: ' + entry.windSpeed;
+			str += ', barometricPressure: ' + entry.barometricPressure;
+			str += '}\n';
+		}
+		str += '], uuid: ' + this.uuid.stringValue + '}';
+		return str;
 	}
 }
 

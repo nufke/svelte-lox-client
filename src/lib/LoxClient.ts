@@ -10,6 +10,8 @@ import TextMessage from './WebSocketMessages/TextMessage';
 import FileMessage from './WebSocketMessages/FileMessage';
 import LoxValueEvent from './LoxEvents/LoxValueEvent';
 import LoxTextEvent from './LoxEvents/LoxTextEvent';
+import LoxDayTimerEvent from './LoxEvents/LoxDayTimerEvent';
+import LoxWeatherEvent from './LoxEvents/LoxWeatherEvent';
 import LoxEnrichableEvent from './LoxEvents/LoxEnrichableEvent';
 import { type LoxClientEvents } from './LoxClientEvents';
 import Control from './Structure/Control';
@@ -437,14 +439,26 @@ export class LoxClient extends EventTarget {
 		this.connection.on('event_table_values', (event: any) => {
 			this.filterAndLogAndEmitEvents(event.detail);
 		});
+
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		this.connection.on('event_table_text', (event: any) => {
 			this.filterAndLogAndEmitEvents(event.detail);
 		});
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		this.connection.on('event_table_day_timer', (event: any) => {
+			this.filterAndLogAndEmitEvents(event.detail);
+		});
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		this.connection.on('event_table_weather', (event: any) => {
+			this.filterAndLogAndEmitEvents(event.detail);
+		});
+
 		this.eventsRegistered = true;
 	}
 
-	private filterAndLogAndEmitEvents(eventTable: (LoxValueEvent | LoxTextEvent)[]) {
+	private filterAndLogAndEmitEvents(eventTable: (LoxValueEvent | LoxTextEvent | LoxDayTimerEvent | LoxWeatherEvent)[]) {
 		// filter by watchlist
 		if (this.uuidWatchlist.size > 0) {
 			eventTable = eventTable.filter((event) => this.uuidWatchlist.has(event.uuid.stringValue));
@@ -467,6 +481,10 @@ export class LoxClient extends EventTarget {
 				this.emit('event_value', event);
 			} else if (event instanceof LoxTextEvent) {
 				this.emit('event_text', event);
+			} else if (event instanceof LoxDayTimerEvent) {
+				this.emit('event_daytimer', event);
+			} else if (event instanceof LoxWeatherEvent) {
+				this.emit('event_weather', event);
 			}
 		});
 	}

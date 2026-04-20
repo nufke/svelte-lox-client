@@ -51,15 +51,15 @@
 		client.parseStructureFile();
 
 		// initiates streaming of events
-		//console.info('test: Enable updates...');
-		//await client.enableUpdates();
+		console.info('test: Enable event updates...');
+		await client.enableUpdates();
 
 		// sets a switch to on
 		//await client.control("90f7abe3-8772-476d-b1dd-a5c1c4cf1ed9", "on");
 
 		// subscribe to value updates
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		client.on("event_value", (event: any) => {
+		client.on('event_value', (event: any) => {
 			let detail = {
 				uuid: event.detail.uuid.stringValue,
 				stateName: event.detail.state?.name,
@@ -71,7 +71,8 @@
 			console.info('test: Received value event', detail);
 		});
 
-		client.on("event_text", (event: any) => {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		client.on('event_text', (event: any) => {
 			let detail = {
 				uuid: event.detail.uuid.stringValue,
 				stateName: event.detail.state?.name,
@@ -83,20 +84,42 @@
 			console.info('test: Received text event', detail);
 		});
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		client.on('event_daytimer', (event: any) => {
+			let detail = {
+				uuid: event.detail.uuid.stringValue,
+				stateName: event.detail.state?.name,
+				value: event.detail.toString(),
+				roomName: event.detail.state?.parentControl?.room?.name,
+				controlName: event.detail.state?.parentControl?.name,
+				eventPath: event.detail.toPath(),
+			}
+			console.info('test: Received daytimer event', detail);
+		});
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		client.on('event_weather', (event: any) => {
+			let detail = {
+				uuid: event.detail.uuid.stringValue,
+				value: event.detail.toString(),
+				eventPath: event.detail.toPath(),
+			}
+			console.info('test: Received weather event', detail);
+		});
+
 		// disconnects and kills token
  		console.info('test: Disconnect client after 5 seconds...');
 		setTimeout( async() => {
 			await client.disconnect();
 		}, 5000);
 	}
-	
+
 	async function disconnect() {
 		console.info('test: Disconnect client...');
 		if (client) {
 			await client.disconnect();
 		}
 	}
-
 </script>
 
 <p><b>TEST: Connect to Loxone Miniserver using WebSocket</b></p>

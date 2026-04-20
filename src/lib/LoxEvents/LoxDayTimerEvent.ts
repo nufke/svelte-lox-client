@@ -1,7 +1,7 @@
 import UUID from '../WebSocketMessages/UUID';
-import { LoxEvent } from './LoxEvent';
+import LoxEnrichableEvent from './LoxEnrichableEvent';
 
-class LoxDayTimerEvent extends LoxEvent {
+class LoxDayTimerEvent extends LoxEnrichableEvent {
 	typeName = LoxDayTimerEvent.name;
 	defValue: number;
 	entries: number;
@@ -22,11 +22,11 @@ class LoxDayTimerEvent extends LoxEvent {
 
 		for (let i = 0; i < this.entries; i++) {
 			this.entry.push({
-				'mode': binaryData.readInt32LE(offset_add),
-				'from': binaryData.readInt32LE(offset_add + 4),
-				'to': binaryData.readInt32LE(offset_add + 8),
-				'needActivate': binaryData.readInt32LE(offset_add + 12),
-				'value': binaryData.readDoubleLE(offset_add + 16),
+				mode: binaryData.readInt32LE(offset_add),
+				from: binaryData.readInt32LE(offset_add + 4),
+				to: binaryData.readInt32LE(offset_add + 8),
+				needActivate: binaryData.readInt32LE(offset_add + 12),
+				value: binaryData.readDoubleLE(offset_add + 16)
 			});
 			offset_add += 24;
 		}
@@ -38,6 +38,27 @@ class LoxDayTimerEvent extends LoxEvent {
 
 	override toPath(): string {
 		return this.uuid.stringValue;
+	}
+
+	formatMinutes(minutes: number): string {
+		const hour = ('00' + Math.floor(minutes / 60)).slice(-2);
+		const minute = ('00' + (minutes % 60)).slice(-2);
+		return hour + ':' + minute;
+	}
+
+	override toString(): string {
+		let str = '{defValue: ' + this.defValue + ', entries: ' + this.entries + ', entry: [\n';
+		for (let i = 0; i < this.entries; i++) {
+			const entry = this.entry[i];
+			str += '{mode: ' + entry.mode;
+			str += ', from: ' + this.formatMinutes(entry.from);
+			str += ', to: ' + this.formatMinutes(entry.to);
+			str += ', needActivate: ' + entry.needActivate;
+			str += ', value: ' + entry.value;
+			str += '}\n';
+		}
+		str += '], uuid: ' + this.uuid.stringValue + '}';
+		return str;
 	}
 }
 
