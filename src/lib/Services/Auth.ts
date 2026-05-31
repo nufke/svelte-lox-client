@@ -4,11 +4,13 @@ import { constants, publicEncrypt } from 'crypto';
 import CommandEncryption from './CommandEncryption';
 import Logger from '../Utils/Logger';
 
+/** 
+ * Class handling the authentication handshake with the Miniserver, including
+ * RSA public-key exchange, AES session-key setup, and token acquisition/refresh.
+ */
 class Auth {
-	private password: string;
-	private username: string;
-	private host: string;
-	private deviceId: string;
+	private hostName: string;
+	private userName: string;
 	private connection: WebSocketConnection;
 	private publicKey: { key: string; padding: number } | undefined;
 	private sessionKey: string | undefined;
@@ -19,22 +21,36 @@ class Auth {
 	commandEncryption: CommandEncryption;
 	log: Logger;
 
-	constructor(log: Logger, connection: WebSocketConnection, host: string, username: string, password: string, deviceId: string) {
+	/**
+	 * Initialises the authentication service with all connection parameters and
+	 * creates the token handler and command encryption instances.
+	 * @param log logger
+	 * @param connection WebSocketConnection
+	 * @param userName name of user
+	 * @param password password of user
+	 * @param deviceId ID of client app  (should be app specific)
+	 * @param permission token lifetime: 2: short (for web) or 4: long (for app)
+	 * 
+	 */
+	constructor(log: Logger, connection: WebSocketConnection, hostName: string, userName: string, password: string, deviceId: string, permission: number) {
 		this.log = log;
 		this.connection = connection;
-		this.host = host;
-		this.username = username;
-		this.password = password;
-		this.deviceId = deviceId;
-
-		this.tokenHandler = new TokenHandler(this, this.log, this.connection, this.username, this.password, this.deviceId);
+		this.hostName = hostName;
+		this.userName = userName;
+		this.tokenHandler = new TokenHandler(this, this.log, this.connection, this.userName, password, deviceId, permission);
 		this.commandEncryption = new CommandEncryption(this);
 	}
 
-	async authenticate(existingToken?: string) {
+	/**
+	 * Method that runs the authentication handshake: fetches the server certificate,
+	 * exchanges the AES session key, then authenticates with an existing token or
+	 * acquires a new one.
+	 * @param existingToken (optional) existing token from previous session
+	 */
+	async authenticate(existingToken?: string): Promise<void> {
 		// 1. get public key
 		await this.getPublicKey();
-		if (!this.publicKey) throw new Error('Public key is missing');
+		if (!this.publicKey) throw new Error('Public key is missing!');
 
 		// 2. verify public key
 		// TODO
@@ -67,14 +83,23 @@ class Auth {
 		this.log.info('Authentication complete');
 	}
 
-	private async getPublicKey() {
-		const url = `${this.host}/jdev/sys/getcertificate`;
+	/** 
+	 * Fetches the server's TLS certificate chain
+	 * and stores the leaf certificate as the public key.
+	 */
+	private async getPublicKey(): Promise<void> {
+		const url = `${this.hostName}/jdev/sys/getcertificate`;
 		const response = await fetch(url);
 		this.parsePublicKey(await response.text());
 	}
 
-	private parsePublicKey(message: string) {
-		const certBlocks = message.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g);
+	/**
+	 * Parses a PEM certificate chain string and stores the last
+	 * certificate block as the RSA public key with PKCS#1 padding.
+	 * @param certificate PEM certificate in plain text
+	 */
+	private parsePublicKey(certificate: string): void {
+		const certBlocks = certificate.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g);
 		if (certBlocks === null || certBlocks?.length === 0) {
 			throw new Error('No public key found in getPublicKey response');
 		}
@@ -85,8 +110,12 @@ class Auth {
 		};
 	}
 
-	async getUserKey() {
-		const getKeyCommand = `jdev/sys/getkey2/${this.username}`;
+	/**
+	 * Fetches the user's HMAC key, salt, and hash algorithm
+	 * and stores them in this instance.
+	 */
+	async getUserKey(): Promise<void> {
+		const getKeyCommand = `jdev/sys/getkey2/${this.userName}`;
 		const getKeyResponse = await this.connection.sendEncryptedTextCommand(getKeyCommand);
 		if (getKeyResponse.code !== 200) {
 			throw new Error(`Failed to getkey2: ${getKeyResponse.code}`);
@@ -100,6 +129,26 @@ class Auth {
 		this.userKey = Buffer.from(serverKeyHex, 'hex');
 		this.userSalt = getKeyResponse.value.salt;
 		this.userHashAlg = getKeyResponse.value.hashAlg;
+	}
+
+	/**
+	 * Fetches the visualization password salt, key, and hash algorithm 
+	 * from a given user, for secured command hashing.
+	 * @returns Object containing key, salt, and hash algorithm
+	 */
+	async getVisuSalt(): Promise<{ key: string; salt: string; hashAlg: string }> {
+		const command = `jdev/sys/getvisusalt/${this.userName}`;
+		const response = await this.connection.sendEncryptedTextCommand(command);
+		if (response.code !== 200) {
+			throw new Error(`Failed to getvisusalt: ${response.code}`);
+		}
+		if (!response.value) {
+			throw new Error('getvisusalt.value is undefined');
+		}
+		const key = response.value.key;
+		const salt = response.value.salt;
+		const hashAlg = response.value.hashAlg;
+		return {key, salt, hashAlg};
 	}
 }
 

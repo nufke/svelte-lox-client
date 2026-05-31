@@ -19,6 +19,11 @@ import State from './Structure/State';
 import Room from './Structure/Room';
 import UUID from './WebSocketMessages/UUID';
 
+/**
+ * Class responsible to communicat with a Loxone Miniserver over a WebSocket
+ * interface. Handles authentication, command dispatch, structure-file parsing,
+ * event streaming, and automatic reconnection.
+ */
 export class LoxClient extends EventTarget {
 	private readonly connection: WebSocketConnection;
 	readonly auth: Auth;
@@ -81,7 +86,7 @@ export class LoxClient extends EventTarget {
 		this.deviceId = deviceId;
 		this.log = new Logger(options.logLevel);
 		this.connection = new WebSocketConnection(this, this.log, this.hostName, this.COMMAND_TIMEOUT, options.messageLogEnabled);
-		this.auth = new Auth(this.log, this.connection, this.hostName, userName, password, deviceId);
+		this.auth = new Auth(this.log, this.connection, this.hostName, userName, password, deviceId, options.tokenLifetime);
 		this.autoReconnect = new AutoReconnect(this, this.log, options.autoReconnectEnabled);
 		this.options = options;
 	}
@@ -89,7 +94,7 @@ export class LoxClient extends EventTarget {
 	/**
 	 * Initiates connection and triggers authentication
 	 */
-	async connect(existingToken?: string) {
+	async connect(existingToken?: string): Promise<void> {
 		if (this._state !== LoxClientState.disconnected && this._state !== LoxClientState.error) {
 			this.log.warn('Not in disconnected or error state, ignoring connect call');
 			return;
@@ -139,7 +144,8 @@ export class LoxClient extends EventTarget {
 	 * Gets the structure file from Miniserver
 	 * @returns the Miniserver LoxAPP3.json structure file
 	 */
-	async getStructureFile() {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	async getStructureFile(): Promise<any> {
 		try {
 			const structureFileMessage = await this.sendFileCommand('data/LoxAPP3.json');
 			this.structureFile = structureFileMessage.data;
@@ -157,7 +163,7 @@ export class LoxClient extends EventTarget {
 	/**
 	 * Enables binary streaming of value and text updates
 	 */
-	async enableUpdates() {
+	async enableUpdates(): Promise<void> {
 		try {
 			this.ensureReadyState('Not connected and authenticated, cannot enable updates');
 			await this.connection.sendUnencryptedTextCommand('jdev/sps/enablebinstatusupdate');
@@ -172,7 +178,7 @@ export class LoxClient extends EventTarget {
 	 * Disconnects the client, optionally preserving the token
 	 * @param preserveToken Whether to preserve the token after disconnecting or not, if omitted, defaults to false
 	 */
-	async disconnect(preserveToken = false) {
+	async disconnect(preserveToken = false): Promise<void> {
 		try {
 			this.setState(LoxClientState.disconnecting);
 
@@ -196,9 +202,11 @@ export class LoxClient extends EventTarget {
 	}
 
 	/**
-	 * Checks whether the token used is still valid
+	 * Checks whether the token used is still valid. Throws an error when the token
+	 * is not valid anymore
+	 * @param token token to be checked
 	 */
-	async checkToken(token?: string) {
+	async checkToken(token: string): Promise<void> {
 		try {
 			this.ensureReadyState('Not connected and authenticated, cannot check token');
 			await this.auth.tokenHandler.checkToken(token);
@@ -212,7 +220,7 @@ export class LoxClient extends EventTarget {
 	/**
 	 * Refreshes the token if it is still valid. Acquires a new token if token is not valid any more
 	 */
-	async refreshToken() {
+	async refreshToken(): Promise<void> {
 		try {
 			this.ensureReadyState('Not connected and authenticated, cannot refresh token');
 			await this.auth.tokenHandler.refreshToken();
@@ -229,10 +237,7 @@ export class LoxClient extends EventTarget {
 	 * @param timeoutOverride (optional) timeoutoverride for this command
 	 * @returns The response from the Miniserver
 	 */
-	async sendTextCommand(
-		command: string,
-		timeoutOverride = this.COMMAND_TIMEOUT
-	): Promise<TextMessage> {
+	async sendTextCommand(command: string, timeoutOverride = this.COMMAND_TIMEOUT): Promise<TextMessage> {
 		try {
 			this.ensureReadyState('Not connected and authenticated, cannot send command');
 			const encrypted = !this.isGen2;
@@ -268,10 +273,11 @@ export class LoxClient extends EventTarget {
 	 * Executes a command on the control identified by the UUID.
 	 * @param uuid The UUID of the control
 	 * @param command The command to execute
+	 * @param visuPw (optional) visualization password for secured controls
 	 * @param timeoutOverride (optional) timeoutoverride for this command
 	 * @returns The response from the Miniserver
 	 */
-	async control(uuid: string, command: string, timeoutOverride = this.COMMAND_TIMEOUT): Promise<TextMessage> {
+	async control(uuid: string, command: string, visuPw?: string, timeoutOverride = this.COMMAND_TIMEOUT): Promise<TextMessage> {
 		try {
 			this.ensureReadyState('Not connected and authenticated, cannot send command');
 			if (this.isStructureFileParsed && !this.controls.has(uuid)) {
@@ -279,11 +285,17 @@ export class LoxClient extends EventTarget {
 			}
 
 			const encrypted = !this.isGen2;
-			const fullCommand = `jdev/sps/io/${uuid}/${command}`;
-			const response = await this.connection.sendCommand<TextMessage>(fullCommand, encrypted, timeoutOverride);
+			let response: TextMessage;
+			if (visuPw) {
+				response = await this.connection.sendSecuredTextCommand(uuid, command, visuPw, encrypted, timeoutOverride);
+			} else {
+				response = await this.connection.sendCommand<TextMessage>(`jdev/sps/io/${uuid}/${command}`, encrypted, timeoutOverride);
+			}
 			if (response.code === 404) {
 				this.log.error(`Miniserver control '${uuid}' not found`);
-			}	else if (response.code !== 200) {
+			} else if (response.code === 500 && visuPw) {
+				this.log.error(`Secured command for '${uuid}' failed - visualization password incorrect`);
+			} else if (response.code !== 200) {
 				this.log.error(`${uuid}/${command} - unknown error, response was not 200 OK, but ${response.code}`);
 			}
 			if (response.value === '0') {
@@ -303,7 +315,7 @@ export class LoxClient extends EventTarget {
 	 * Parses the structure file and extracts relevant information. After calling this event, emitted event updates will
 	 * contain enriched information about the room, control, and state names.
 	 */
-	async parseStructureFile() {
+	async parseStructureFile(): Promise<void> {
 		if (!this.structureFile) {
 			this.log.warn('No structure file loaded, trying to get it');
 			await this.getStructureFile();
@@ -382,11 +394,16 @@ export class LoxClient extends EventTarget {
 	 * Sets the log level for the client.
 	 * @param level The log level to set
 	 */
-	setLogLevel(level: LogLevel) {
+	setLogLevel(level: LogLevel): void {
 		this.log.setLogLevel(level);
 	}
 
-	private registerEvents() {
+	/** 
+	 * Wires up all WebSocket connection events to their handlers
+	 * (disconnect/reconnect logic, event table forwarding). 
+	 * No-ops if already registered.
+	 */
+	private registerEvents(): void {
 		if (this.eventsRegistered) {
 			return;
 		}
@@ -458,7 +475,13 @@ export class LoxClient extends EventTarget {
 		this.eventsRegistered = true;
 	}
 
-	private filterAndLogAndEmitEvents(eventTable: (LoxValueEvent | LoxTextEvent | LoxDayTimerEvent | LoxWeatherEvent)[]) {
+	/**
+	 * Filters an event table by the UUID watchlist,
+	 * enriches each event with structure-file data, optionally logs it, 
+	 * and emits the appropriate typed event.
+	 * @param eventTable of type LoxValueEvent, LoxTextEvent, LoxDayTimerEvent or LoxWeatherEvent
+	 */
+	private filterAndLogAndEmitEvents(eventTable: (LoxValueEvent | LoxTextEvent | LoxDayTimerEvent | LoxWeatherEvent)[]): void {
 		// filter by watchlist
 		if (this.uuidWatchlist.size > 0) {
 			eventTable = eventTable.filter((event) => this.uuidWatchlist.has(event.uuid.stringValue));
@@ -494,7 +517,7 @@ export class LoxClient extends EventTarget {
 	 * If the watchlist is empty, all events will be emitted.
 	 * @param uuid The UUID or array of UUIDs to add
 	 */
-	addUuidToWatchList(uuid: string | string[]) {
+	addUuidToWatchList(uuid: string | string[]): void {
 		const ids = Array.isArray(uuid) ? uuid : [uuid];
 		for (const id of ids) {
 			if (this.isStructureFileParsed && !this.states.has(id)) {
@@ -508,11 +531,17 @@ export class LoxClient extends EventTarget {
 	 * Removes one or more UUIDs from the watch list.
 	 * @param uuid The UUID or array of UUIDs to remove
 	 */
-	removeUuidFromWatchList(uuid: string | string[]) {
+	removeUuidFromWatchList(uuid: string | string[]): void {
 		const ids = Array.isArray(uuid) ? uuid : [uuid];
 		ids.forEach((id) => this.uuidWatchlist.delete(id));
 	}
 
+	/**
+	 * Attaches the matching State (and through it the parent Control and Room)
+	 * to event when the structure file has been parsed.
+	 * @param T event type inherited from LoxEnrichableEvent
+	 * @returns same event type as specified incoming event type
+	 */
 	private enrichEvent<T extends LoxEnrichableEvent>(event: T): T {
 		if (!this.isStructureFileParsed) {
 			return event;
@@ -527,7 +556,11 @@ export class LoxClient extends EventTarget {
 		return event;
 	}
 
-	private async checkVersion() {
+	/**
+	 * Validates if the Miniserver firmware version is ≥ 11.2,
+	 * and sets isGen2 when the response indicates TLS/HTTPS support.
+	 */
+	private async checkVersion(): Promise<void> {
 		this.log.info('Checking Miniserver version...');
 		const response = await fetch(`${this.hostName}/jdev/cfg/apiKey`);
 		if (response.status === 503) {
@@ -553,13 +586,23 @@ export class LoxClient extends EventTarget {
 		}
 	}
 
-	private ensureReadyState(errorReason: string) {
+	/**
+	 * Throw error if the client is not in the ready state, 
+	 * and report error reason
+	 * @param errorReason error message explaining the reason
+	 */
+	private ensureReadyState(errorReason: string): void {
 		if (this._state !== LoxClientState.ready) {
 			throw new Error(`Client is not in an expected state - ${errorReason}`);
 		}
 	}
 
-	private setState(state: LoxClientState) {
+	/**
+	 * Updates the internal state and emits a state change, 
+	 * but only when the new state differs from the current one.
+	 * @param state incoming state of type LoxClientState
+	 */
+	private setState(state: LoxClientState): void {
 		if (this._state !== state) {
 			this._state = state;
 			this.log.info(`State changed to: ${state}`);
@@ -567,12 +610,22 @@ export class LoxClient extends EventTarget {
 		}
 	}
 
-	// Compatibility layer for app to emit events
-	on<K extends keyof LoxClientEvents>(event: K, listener: LoxClientEvents[K]) {
+	/**
+	 * Registers a typed event listener for the given event key
+	 * @param event incoming event of type LoxClientEvents
+	 * @param listener listener callback 
+	 */
+	on<K extends keyof LoxClientEvents>(event: K, listener: LoxClientEvents[K]): void {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		this.addEventListener(event as string, listener as (...args: any[]) => void);
 	}
 
+	/**
+	 * Dispatches a typed CustomEvent
+	 * @param event incoming event of type LoxClientEvents
+	 * @param args optional arguments, where first argument is passed as CustomEvent event detail
+	 * @returns false if event is cancelable. Otherwise true.
+	 */
 	emit<K extends keyof LoxClientEvents>(event: K, ...args: Parameters<LoxClientEvents[K]>): boolean {
 		return this.dispatchEvent(new CustomEvent(event, { detail: args[0] }));
 	}

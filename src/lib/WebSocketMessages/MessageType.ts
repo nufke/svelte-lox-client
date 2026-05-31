@@ -1,3 +1,7 @@
+/**
+ * Enumeration that identifies the payload type that follows a
+ * binary WebSocket header frame from the Miniserver.
+ */
 enum MessageType {
 	TEXT = 0,
 	BINARY_FILE = 1,

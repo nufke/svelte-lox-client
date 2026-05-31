@@ -1,6 +1,11 @@
 import Logger from '../Utils/Logger';
 import LoxClient from '../LoxClient';
 
+/**
+ * Class that manages automatic reconnection after a disconnect,
+ * retrying every 30 seconds until a connection is re-established
+ * or reconnection is disabled.
+ */
 class AutoReconnect {
 	autoReconnectEnabled: boolean;
 	autoReconnectingInProgress = false;
@@ -11,13 +16,21 @@ class AutoReconnect {
 
 	reconnectResolve: undefined | ((value: boolean | PromiseLike<boolean>) => void);
 
+	/**
+	 * Initialises the auto-reconnect service with the owning client,
+	 * logger, and whether reconnection is enabled.
+	 */
 	constructor(client: LoxClient, log: Logger, autoReconnectEnabled: boolean) {
 		this.autoReconnectEnabled = autoReconnectEnabled;
 		this.client = client;
 		this.log = log;
 	}
 
-	async startAutoReconnect(existingToken?: string) {
+	/**
+	 * Starts the reconnection loop, waiting 30 seconds between attempts; 
+	 * passes `existingToken` to each reconnect call. No-ops if already running or disabled.
+	 */
+	async startAutoReconnect(existingToken?: string): Promise<void> {
 		if (this.autoReconnectingInProgress) return;
 		if (!this.autoReconnectEnabled) return;
 
@@ -50,7 +63,11 @@ class AutoReconnect {
 		}
 	}
 
-	stopAutoReconnect() {
+	/**
+	 * Cancels the active reconnect loop and any pending sleep timer,
+	 * allowing a clean exit from startAutoReconnect.
+	 */
+	stopAutoReconnect(): void {
 		this.autoReconnectingInProgress = false;
 
 		if (this.reconnectTimeout) {
@@ -70,7 +87,10 @@ class AutoReconnect {
 		}
 	}
 
-	disableAutoReconnect() {
+	/**
+	 * Permanently disables auto-reconnection and stops any in-progress reconnect loop.
+	 */
+	disableAutoReconnect(): void {
 		this.autoReconnectEnabled = false;
 		this.stopAutoReconnect();
 	}

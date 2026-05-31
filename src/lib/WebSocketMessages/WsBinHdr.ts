@@ -1,5 +1,5 @@
 /**
- * Represents the packed WebSocket binary header (WsBinHdr) from the C struct:
+ * Class that represents the packed WebSocket binary header (WsBinHdr) from the C struct:
  *
  * typedef struct {
  *   BYTE cBinType;    // fix 0x03
@@ -20,6 +20,10 @@ class WsBinHdr {
 	cReserved: number; // 1 byte
 	nLen: number; // 4 bytes (uint32 little-endian)
 
+	/**
+	 * Creates an instance with explicit field values; 
+	 * all fields default to zero except cBinType (0x03).
+	 */
 	constructor(cBinType = 0x03, cIdentifier = 0, cInfo = 0, cReserved = 0, nLen = 0) {
 		this.cBinType = cBinType;
 		this.cIdentifier = cIdentifier;

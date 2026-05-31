@@ -20,19 +20,8 @@
 		// instantiate the client
 		client = new LoxClient(hostName, userName, password, deviceId, {logLevel: LogLevel.DEBUG});
 
-		// subscribe to basic events
-		client.on('connected', () => {
-			console.info('test: Client connected');
-		});
-
-		client.on('disconnected', () => {
-			console.info('test: Client disconnected');
-		});
-
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		client.on('error', (error: any) => {
-			console.error(`test: Client error: ${error.message}`, error);
-		});
+		// listen to events
+		subscribeToEvents();
 
 		// initiate connection
 		console.info('test: Client connecting to Miniserver...');
@@ -56,6 +45,28 @@
 
 		// sets a switch to on
 		//await client.control("90f7abe3-8772-476d-b1dd-a5c1c4cf1ed9", "on");
+
+		// disconnects and kills token
+ 		console.info('test: Disconnect client after 5 seconds...');
+		setTimeout( async() => {
+			await client?.disconnect();
+		}, 5000);
+	}
+
+	function subscribeToEvents() {
+		// subscribe to basic events
+		client.on('connected', () => {
+			console.info('test: Client connected');
+		});
+
+		client.on('disconnected', () => {
+			console.info('test: Client disconnected');
+		});
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		client.on('error', (error: any) => {
+			console.error(`test: Client error: ${error.message}`, error);
+		});
 
 		// subscribe to value updates
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -106,12 +117,6 @@
 			}
 			console.info('test: Received weather event', detail);
 		});
-
-		// disconnects and kills token
- 		console.info('test: Disconnect client after 5 seconds...');
-		setTimeout( async() => {
-			await client.disconnect();
-		}, 5000);
 	}
 
 	async function disconnect() {

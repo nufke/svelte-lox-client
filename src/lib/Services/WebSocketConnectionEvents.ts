@@ -6,6 +6,10 @@ import FileMessage from '../WebSocketMessages/FileMessage';
 import ParsedHeader from '../WebSocketMessages/ParsedHeader';
 import TextMessage from '../WebSocketMessages/TextMessage';
 
+/**
+ * Interface definition of WebSocketConnectionEvent.
+ * Used to provide strongly-typed `on` and `emit` overloads for Typed event map for WebSocketConnection.
+ */
 export interface WebSocketConnectionEvents {
 	connected: () => void;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -10,9 +10,12 @@ import ParsedHeader from '../WebSocketMessages/ParsedHeader';
 import LoxClient from '../LoxClient';
 import Logger from '../Utils/Logger';
 import { maskEnc } from '../Utils/Masker';
+import { hash, hmacHash } from '../Utils/Hasher';
 import { type WebSocketConnectionEvents } from './WebSocketConnectionEvents';
 
-// Generic pending queue entry for text/file command promises
+/**
+ * Interface definition of pending queue entry for text/file command promises.
+ */
 interface PendingQueueEntry<T extends FileMessage | TextMessage> {
 	command: {
 		originalCommand: string;
@@ -24,10 +27,15 @@ interface PendingQueueEntry<T extends FileMessage | TextMessage> {
 	timer: NodeJS.Timeout;
 }
 
+/**
+ * Class that manages the WebSocket connection to the Miniserver.
+ * It handles the binary message-type state machine, queues outgoing commands
+ * with timeout-based promise resolution, and emits typed events for clients.
+ */
 class WebSocketConnection extends EventTarget {
 	private nextExpectedMessageType: MessageType = MessageType.HEADER;
 	private ws: WebSocket | undefined;
-	private host: string;
+	private hostName: string;
 	private LoxClient: LoxClient;
 
 	// keepalive handling
@@ -45,17 +53,30 @@ class WebSocketConnection extends EventTarget {
 	private log: Logger;
 	private messageLog: boolean;
 
-	constructor(LoxClient: LoxClient, log: Logger, host: string, commandTimeout: number, messageLog: boolean) {
+	/**
+	 * Initializes the WebSocket connection manager.
+	 * Note: it does not open the WebSocket until the connect method is called.
+	 * @param LoxClient client instance
+	 * @param log logger instance
+	 * @param hostName name of host
+	 * @param commandTimeout timeout for commands
+	 * @param messageLog enable logging of info messages
+	 */
+	constructor(LoxClient: LoxClient, log: Logger, hostName: string, commandTimeout: number, messageLog: boolean) {
 		super();
 		this.LoxClient = LoxClient;
-		this.host = host;
+		this.hostName = hostName;
 		this.COMMAND_TIMEOUT = commandTimeout;
 		this.log = log;
 		this.messageLog = messageLog;
 	}
 
-	async connect() {
-		const found = this.host.match(/(.*\/\/)?(.*)/);
+	/**
+	 * Opens a WebSocket connection to the Miniserver, using secure WebSocket (wss) connection
+	 * when the host scheme is `https`, otherwise use a non-secure WebSocket (ws) connection.
+	 */
+	async connect(): Promise<void> {
+		const found = this.hostName.match(/(.*\/\/)?(.*)/);
 		const protocol = found && found[1].includes('https') ? 'wss' : 'ws';
 		const url = found && found[2] ? `${protocol}://${found[2]}/ws/rfc6455` : null;
 
@@ -78,13 +99,17 @@ class WebSocketConnection extends EventTarget {
 			this.handleMessage(message);
 		});
 
-		return new Promise((resolve, reject) => {
-			this.ws?.addEventListener('open', resolve);
+		return new Promise<void>((resolve, reject) => {
+			this.ws?.addEventListener('open', () => resolve());
 			this.ws?.addEventListener('error', reject);
 		});
 	}
 
-	enableKeepAlive() {
+	/**
+	 * Starts sending a keepalive command every 15 seconds; closes the connection
+	 * if a keepalive times out. No-ops if already active.
+	 */
+	enableKeepAlive(): void {
 		if (this.keepAliveEnabled) {
 			return;
 		}
@@ -108,7 +133,10 @@ class WebSocketConnection extends EventTarget {
 		}, this.KEEPALIVE_INTERVAL_MS);
 	}
 
-	private stopKeepAlive() {
+	/**
+	 * Cancels the keepalive interval timer and marks keepalive as disabled.
+	 */
+	private stopKeepAlive(): void {
 		this.keepAliveEnabled = false;
 		if (this.keepAliveInterval) {
 			clearInterval(this.keepAliveInterval);
@@ -116,7 +144,10 @@ class WebSocketConnection extends EventTarget {
 		}
 	}
 
-	private cleanCommandQueueAndRejectPromises(reason: string) {
+	/**
+	 * Cancels all pending command timers and rejects their promises with an error.
+	 */
+	private cleanCommandQueueAndRejectPromises(reason: string): void {
 		// Reject all outstanding command promises
 		const err = new Error(`Failing pending request because ${reason}`);
 		for (const entry of this.commandQueue) {
@@ -130,15 +161,23 @@ class WebSocketConnection extends EventTarget {
 		this.commandQueue = [];
 	}
 
+	/**
+	 * Triggers a full disconnect when called by a WebSocket close or error event,
+	 * and forwarding the event as message including the reason.
+	 */
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	cleanupAfterDisconnectOrError(event: any) {
+	cleanupAfterDisconnectOrError(event: any): void {
 		if (this.ws) {
 			this.disconnect(event);
 		}
 	}
 
+	/**
+	 * Stop sending keepalives, rejects all pending commands, closes the WebSocket,
+	 * and emits `disconnected` with the close reason.
+	 */
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	disconnect(msg: any) {
+	disconnect(msg: any): void {
 		const reason: string = 'Closed with error/reason: ' + msg.reason ? msg.reason : msg;
 		// stop keepalive timers immediately when intentionally disconnecting
 		this.stopKeepAlive();
@@ -154,8 +193,13 @@ class WebSocketConnection extends EventTarget {
 		this.emit('disconnected', reason);
 	}
 
+	/**
+	 * Routes each incoming WebSocket frame to the correct parser
+	 * (header, text, binary file, or event table) based on the protocol state machine.
+	 * @param message incoming message
+	 */
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	handleMessage(message: any) {
+	private handleMessage(message: any): void {
 		const isBinary = message.data instanceof ArrayBuffer;
 		switch (this.nextExpectedMessageType) {
 			case MessageType.HEADER: {
@@ -177,7 +221,7 @@ class WebSocketConnection extends EventTarget {
 					}
 				}
 
-				this.log.debug(`  Received header with message type ${MessageType[header.messageType]}, estimated = ${header.isEstimated}`);
+				this.log.debug(`Received header with message type ${MessageType[header.messageType]}, estimated = ${header.isEstimated}`);
 
 				this.emit('header', header);
 				this.nextExpectedMessageType = header.getNextExpectedMessageType();
@@ -261,6 +305,13 @@ class WebSocketConnection extends EventTarget {
 		}
 	}
 
+	/**
+	 * Parses a binary event-table payload into an array of type LoxEvent.
+	 * @param ctorType constrictor of Event
+	 * @param data message data
+	 * @param isBinary true for binary message, otherwise false
+	 * @returns event table
+	 */
 	private parseEventTables<T extends LoxEvent>(ctorType: LoxEventCtor<T>, data: ArrayBuffer, isBinary: boolean): T[] {
 		if (!isBinary) {
 			throw new Error('Expected binary data for event table');
@@ -282,19 +333,65 @@ class WebSocketConnection extends EventTarget {
 		return items;
 	}
 
+	/**
+	 * Sends the command over the WebSocket with AES-256-CBC encryption
+	 * and returns the matching text response.
+	 * @param command command to be sent
+	 * @param timeoutMs (optional) timeout in ms for the WebSocket connected 
+	 * @returns text message of type TextMessage
+	 */
 	async sendEncryptedTextCommand(command: string, timeoutMs: number = this.COMMAND_TIMEOUT): Promise<TextMessage> {
 		return this.sendCommand<TextMessage>(command, true, timeoutMs);
 	}
 
+	/**
+	 * Sends the command over the WebSocket in plain text
+	 * and returns the matching text response.
+	 * @param command command to be sent
+	 * @param timeoutMs (optional) timeout in ms for the WebSocket connected 
+	 * @returns text message of type TextMessage
+	 */
 	async sendUnencryptedTextCommand(command: string, timeoutMs: number = this.COMMAND_TIMEOUT): Promise<TextMessage> {
 		return this.sendCommand<TextMessage>(command, false, timeoutMs);
 	}
 
+	/**
+	 * Sends a visualization-password-protected command over the WebSocket in plain text,
+	 * where the visualization-password is passed as hash
+	 * @param uuid UUID of the control
+	 * @param command command to be sent
+	 * @param visuPw visualization password
+	 * @param encrypt (optional) encryption set to true for Gen1, false for Gen2 miniserver (default = false)
+	 * @param timeoutMs (optional) timeout in ms for the WebSocket connected 
+	 * @returns text message of type TextMessage
+	 */
+	async sendSecuredTextCommand(uuid: string, command: string, visuPw: string, encrypt = false, timeoutMs: number = this.COMMAND_TIMEOUT): Promise<TextMessage> {
+		const { key, salt, hashAlg } = await this.LoxClient.auth.getVisuSalt();
+		const visuPwHash = hash(`${visuPw}:${salt}`, hashAlg).toUpperCase();
+		const visuHash = hmacHash(visuPwHash, Buffer.from(key, 'hex'), hashAlg);
+		const securedCommand = `jdev/sps/ios/${visuHash}/${uuid}/${command}`;
+		return this.sendCommand<TextMessage>(securedCommand, encrypt, timeoutMs);
+	}
+
+	/**
+	 * Requests a file from the Miniserver and returns the binary or text payload.
+	 * @param filename file requested
+	 * @param timeoutMs (optional) timeout in ms for the WebSocket connected
+	 * @returns file of type FileMessage
+	 */
 	async sendUnencryptedFileCommand(filename: string, timeoutMs: number = this.COMMAND_TIMEOUT): Promise<FileMessage> {
 		this.lastFilenameRequested = filename;
 		return this.sendCommand<FileMessage>(filename, false, timeoutMs);
 	}
 
+	/**
+	 * Sends a command over the WebSocket and returns a promise that resolves
+	 * with the matching response or rejects after a given timeout.
+	 * @param command command to be sent
+	 * @param encrypt (optional) encryption set to true for Gen1, false for Gen2 miniserver (default = false)
+	 * @param timeoutMs (optional) timeout in ms for the WebSocket connected
+	 * @returns file or text of type FileMessage or TextMessage respectively
+	 */
 	async sendCommand<T extends FileMessage | TextMessage>(command: string, encrypt = false, timeoutMs: number = this.COMMAND_TIMEOUT): Promise<T> {
 		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
 			throw new Error('Cannot send websocket command, readystate is not open');
@@ -349,6 +446,11 @@ class WebSocketConnection extends EventTarget {
 		});
 	}
 
+	/**
+	 * Finds the index of a pending queue entry whose original or encrypted command.
+	 * @param command command to be sent
+	 * @returns index in queue
+	 */
 	private findCommandQueueEntryIndex(command: string): number {
 		const i = this.commandQueue.findIndex( (q) => (q.command.encryptedCommand && decodeURIComponent(q.command.encryptedCommand) === command) ||
 			(q.command.encryptedCommand &&decodeURIComponent(q.command.encryptedCommand).replace('jdev', 'dev') === command) ||
@@ -356,11 +458,22 @@ class WebSocketConnection extends EventTarget {
 		return i;
 	}
 
-	on<K extends keyof WebSocketConnectionEvents>(event: K, listener: WebSocketConnectionEvents[K]) {
+	/**
+	 * Registers a typed event listener for the given event key of type WebSocketConnectionEvents.
+	 * @param event event of type WebSocketConnectionEvents
+	 * @param listener listener callback 
+	 */
+	on<K extends keyof WebSocketConnectionEvents>(event: K, listener: WebSocketConnectionEvents[K]): void {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		this.addEventListener(event as string, listener as (...args: any[]) => void);
 	}
 
+	/**
+	 * Dispatches a typed CustomEvent.
+	 * @param event incoming event of type WebSocketConnectionEvents
+	 * @param args optional arguments, where first argument is passed as CustomEvent event detail
+	 * @returns false if event is cancelable. Otherwise true.
+	 */
 	emit<K extends keyof WebSocketConnectionEvents>(event: K, ...args: Parameters<WebSocketConnectionEvents[K]>): boolean {
 		return this.dispatchEvent(new CustomEvent(event, { detail: args[0] }));
 	}

@@ -1,3 +1,8 @@
+/**
+ * Class that parses and represents a Loxone 128-bit UUID from a little-endian
+ * binary buffer, converting it to the standard 
+ * `xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxxxxxx` string format.
+ */
 class UUID {
 	data_length: number;
 	private data1: Buffer;
@@ -7,6 +12,12 @@ class UUID {
 	stringValue: string;
 	static empty: UUID = new UUID(Buffer.alloc(16), 0);
 
+	/**
+	 * Parses a 128-bit little-endian UUID and converts it to the
+	 * standard string representation.
+	 * @param binaryData Buffer with binary data
+	 * @param offset offset
+	 */
 	constructor(binaryData: Buffer, offset: number) {
 		this.data1 = Buffer.from(binaryData.subarray(offset + 0, offset + 4));
 		this.data2 = Buffer.from(binaryData.subarray(offset + 4, offset + 6));
@@ -26,17 +37,30 @@ class UUID {
 			this.data4.toString('hex');
 	}
 
+	/**
+	 * Returns the UUID in standard `xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxxxxxx` string format.
+	 */
 	toString(): string {
 		return this.stringValue;
 	}
 
-	private static _swap_16(data: Buffer) {
+	/**
+	 * Swaps the two bytes of a 16-bit field in-place to convert
+	 * between little- and big-endian.
+	 * @param data data of type Buffer
+	 */
+	private static _swap_16(data: Buffer): void {
 		const t = data[0];
 		data[0] = data[1];
 		data[1] = t;
 	}
 
-	private static _swap_32(data: Buffer) {
+	/**
+	 * Reverses the four bytes of a 32-bit field in-place to convert
+	 * between little- and big-endian.
+	 * @param data data of type Buffer
+	 */
+	private static _swap_32(data: Buffer): void {
 		let t = data[0];
 		data[0] = data[3];
 		data[3] = t;
@@ -45,6 +69,12 @@ class UUID {
 		data[2] = t;
 	}
 
+	/**
+	 * Parses a UUID string in `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+	 * or `xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxxxxxx` format into a UUID instance.
+ 	 * @param uuidString UUID given as string
+ 	 * @returns UUID as type UUID
+	 */
 	static fromString(uuidString: string): UUID {
 		let parts = uuidString.split('-');
 		if (parts.length === 5) {

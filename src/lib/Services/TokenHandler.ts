@@ -4,10 +4,15 @@ import WebSocketConnection from '../Services/WebSocketConnection';
 import TextMessage from '../WebSocketMessages/TextMessage';
 import Logger from '../Utils/Logger';
 
+/** 
+ * Class that manages token lifecycle for the Miniserver connection.
+ * Acquires, refreshes, checks, and revokes tokens, and schedules automatic
+ * refresh before expiry.
+ */
 class TokenHandler {
 	token: string | undefined;
 	auth: Auth;
-	username: string;
+	userName: string;
 	deviceId: string;
 	connection: WebSocketConnection;
 	validUntil: string | undefined;
@@ -22,17 +27,34 @@ class TokenHandler {
 	private refreshMaxRetries = 5;
 	private refreshRetries = 0;
 	log: Logger;
+	private permission: number; // token lifetime: 2= short, 4=long
 
-	constructor(auth: Auth, log: Logger, connection: WebSocketConnection, username: string, password: string, deviceId: string) {
+	/**
+	 * Initialises the token handler with auth service, logger, connection,
+	 * and user credentials.
+	 * @param auth authentication
+	 * @param log logger
+	 * @param connection WebSocketConnection
+	 * @param userName name of user
+	 * @param password password of user
+	 * @param deviceId ID of client app  (should be app specific)
+	 * @param permission token lifetime: 2: short (for web) or 4: long (for app)
+	 */
+	constructor(auth: Auth, log: Logger, connection: WebSocketConnection, userName: string, password: string, deviceId: string, permission: number) {
 		this.log = log;
 		this.auth = auth;
 		this.connection = connection;
-		this.username = username;
+		this.userName = userName;
 		this.password = password;
 		this.deviceId = deviceId;
+		this.permission = permission;
 	}
 
-	async refreshToken() {
+	/**
+	 * Refreshes the current token and schedules the next refresh; 
+	 * acquires a new token instead if the current one has already expired.
+	 */
+	async refreshToken(): Promise<void> {
 		if (!this.token || !this.validUntilDateUTC) {
 			throw new Error('No token to refresh');
 		}
@@ -55,8 +77,8 @@ class TokenHandler {
 		// 2. hash token
 		const tokenHash = hmacHash(this.token, this.auth.userKey);
 
-		// 3. Request a JSON Web Token using /jdev/sys/refreshjwt/{tokenHash}/{this.username}
-		const refreshTokenCommand = `jdev/sys/refreshjwt/${tokenHash}/${this.username}`;
+		// 3. Request a JSON Web Token using /jdev/sys/refreshjwt/{tokenHash}/{this.userName}
+		const refreshTokenCommand = `jdev/sys/refreshjwt/${tokenHash}/${this.userName}`;
 		const refreshTokenResponse = await this.connection.sendEncryptedTextCommand(refreshTokenCommand);
 
 		// 4. Store response
@@ -64,7 +86,10 @@ class TokenHandler {
 		this.processTokenResponse(refreshTokenResponse);
 	}
 
-	async acquireToken() {
+	/**
+	 * Acquires a new long-lived token using the hashed user credentials and schedules automatic refresh.
+	 */
+	async acquireToken(): Promise<void> {
 		// 1. Acquire the key, salt & hashAlg at once using /jdev/sys/getkey2/{user}
 		await this.auth.getUserKey();
 		if (!this.auth.userKey) {
@@ -76,34 +101,39 @@ class TokenHandler {
 		const pwdHash = hash(pwdHashPayload, this.auth.userHashAlg).toUpperCase();
 
 		// 3. Create the hmac hash that includes the user name
-		const userHashPayload = `${this.username}:${pwdHash}`;
+		const userHashPayload = `${this.userName}:${pwdHash}`;
 		const userHash = hmacHash(userHashPayload, this.auth.userKey);
 
 		// 4. Request a JSON Web Token using /jdev/sys/getjwt/{hash}/{user}/{permission}/{uuid}/{info}
-		if (!this.deviceId) {
-			throw new Error('Device ID is missing');
+		if (!this.deviceId || !this.deviceId.length) {
+			throw new Error('Device ID is missing!');
 		}
 
-		const permission = 4; // permission for long lived token, used for Apps
-		const info = `svelte-lox-client-${this.username}`; // client description
-		const jwtUrl = `jdev/sys/getjwt/${userHash}/${this.username}/${permission}/${this.deviceId}/${info}`;
+		const permission = this.permission == 2 || this.permission == 4 ? this.permission : 4; 
+		const info = `svelte-lox-client-${this.userName}`; // client description
+		const jwtUrl = `jdev/sys/getjwt/${userHash}/${this.userName}/${permission}/${this.deviceId}/${info}`;
 		const jwtResponse = await this.connection.sendEncryptedTextCommand(jwtUrl);
 
 		// 5. Store the response, it contains info on the lifespan, the permissions granted with that token and the JSON Web Token itself.
 		if (jwtResponse.code !== 200) {
-			throw new Error(`Failed to acquire JWT: ${jwtResponse.code}`);
+			throw new Error(`Failed to acquire token: ${jwtResponse.code}`);
 		}
 		if (!jwtResponse.value) {
 			throw new Error('jwtResponse.value is undefined');
 		}
 
-		this.log.info('Acquired token');
+		const duration = permission == 4 ? 'long-lived app' : 'short-lived web';
+		this.log.info(`Acquired ${duration} token`);
 
 		this.token = jwtResponse.value.token;
 		this.processTokenResponse(jwtResponse);
 	}
 
-	async checkToken(token?: string) {
+	/**
+	 * Verifies if the given or stored token is still valid.
+	 * @param token (optional) token to be checked
+	 */
+	async checkToken(token?: string): Promise<void> {
 		const tokenTocheck = token || this.token;
 		if (!tokenTocheck) return;
 
@@ -112,7 +142,7 @@ class TokenHandler {
 			throw new Error('User key is missing');
 		}
 		const tokenHash = hmacHash(tokenTocheck, this.auth.userKey);
-		const checkTokenCommand = `jdev/sys/checktoken/${tokenHash}/${this.username}`;
+		const checkTokenCommand = `jdev/sys/checktoken/${tokenHash}/${this.userName}`;
 		const checkTokenResponse = await this.connection.sendEncryptedTextCommand(checkTokenCommand);
 		if (checkTokenResponse.code !== 200) {
 			this.log.info(`Token is not valid: ${checkTokenResponse.code}`);
@@ -121,7 +151,11 @@ class TokenHandler {
 		this.log.info(`Token is valid: ${checkTokenResponse.code}`);
 	}
 
-	async authenticateWithToken(token: string) {
+	/**
+	 * Authenticates the WebSocket session and schedules automatic refresh.
+	 * @param token token to be used in authentication
+	 */
+	async authenticateWithToken(token: string): Promise<void> {
 		if (!token) {
 			return;
 		}
@@ -131,7 +165,7 @@ class TokenHandler {
 		}
 		const tokenHash = hmacHash(token, this.auth.userKey);
 
-		const authWithTokenCommand = `authwithtoken/${tokenHash}/${this.username}`;
+		const authWithTokenCommand = `authwithtoken/${tokenHash}/${this.userName}`;
 		const authWithTokenResponse = await this.connection.sendEncryptedTextCommand(authWithTokenCommand);
 		if (authWithTokenResponse.code !== 200) {
 			throw new Error(`Failed to authenticate with existing token: ${authWithTokenResponse.code}`);
@@ -142,7 +176,11 @@ class TokenHandler {
 		this.processTokenResponse(authWithTokenResponse);
 	}
 
-	async killToken() {
+	/**
+	 * Revokes the current token on the Miniserver, cancel any scheduled refresh,
+	 * and ignores errors (the server will close the connection).
+	 */
+	async killToken(): Promise<void> {
 		if (this.token) {
 			await this.auth.getUserKey();
 			if (!this.auth.userKey) {
@@ -150,7 +188,7 @@ class TokenHandler {
 			}
 
 			const tokenHash = hmacHash(this.token, this.auth.userKey);
-			const killTokenCommand = `jdev/sys/killtoken/${tokenHash}/${this.username}`;
+			const killTokenCommand = `jdev/sys/killtoken/${tokenHash}/${this.userName}`;
 			try {
 				await this.connection.sendEncryptedTextCommand(killTokenCommand);
 				// Miniserver will disconnect the websocket
@@ -158,11 +196,16 @@ class TokenHandler {
 				/* ignore any exceptions */
 			}
 			this.clearScheduledRefresh();
-			this.log.info('Token killed');
+			this.log.info('Token killed on request');
 		}
 	}
 
-	private processTokenResponse(tokenResponse: TextMessage) {
+	/**
+	 * Stores the time validity of the token 
+	 * and schedule the next automatic refresh.
+	 * @param tokenResponse response from Miniserver to confirm token validity
+	 */
+	private processTokenResponse(tokenResponse: TextMessage): void {
 		this.validUntil = tokenResponse.value.validUntil;
 		if (!this.validUntil) {
 			throw new Error('Token validUntil is missing');
@@ -178,17 +221,21 @@ class TokenHandler {
 		this.scheduleRefresh();
 	}
 
-	// Clear any pending refresh timer
-	clearScheduledRefresh() {
+	/**
+	 * Cancels any pending token refresh timer.
+	 */
+	clearScheduledRefresh(): void {
 		if (this.refreshTimer) {
 			clearTimeout(this.refreshTimer);
 			this.refreshTimer = undefined;
 		}
 	}
 
-	// Schedule a refresh attempt some time before validUntilDate.
-	// If the computed time is already past, attempt immediate refresh.
-	private scheduleRefresh() {
+	/**
+	 * Schedules the next token refresh before expiry, capped at one week;
+	 * Retries with backoff on failure up to specified maximum number of retries.
+	 */
+	private scheduleRefresh(): void {
 		this.clearScheduledRefresh();
 
 		if (!this.token || !this.validUntilDateUTC) throw new Error('No token to schedule refresh for');

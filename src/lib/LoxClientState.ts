@@ -1,3 +1,6 @@
+/**
+ * Enumeration that represents the connection lifecycle state of a LoxClient instance.
+ */
 enum LoxClientState {
 	disconnected = 'disconnected',
 	disconnecting = 'disconnecting',

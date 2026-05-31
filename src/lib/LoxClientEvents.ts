@@ -6,6 +6,10 @@ import LoxWeatherEvent from './LoxEvents/LoxWeatherEvent';
 import FileMessage from './WebSocketMessages/FileMessage';
 import TextMessage from './WebSocketMessages/TextMessage';
 
+/**
+ * Interface definition of LoxClientEvent.
+ * Used to provide strongly-typed `on` and `emit` overloadss for typed event map for LoxClient
+ */
 export interface LoxClientEvents {
 	connected: () => void;
 	disconnected: (reason: string) => void;

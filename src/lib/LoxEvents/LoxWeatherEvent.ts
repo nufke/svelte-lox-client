@@ -1,6 +1,10 @@
 import UUID from '../WebSocketMessages/UUID';
 import LoxEnrichableEvent from './LoxEnrichableEvent';
 
+/**
+ * Class representing the Loxone weather event received as ETABLE_WEATHER binary;
+ * holds a last-update timestamp and a list of hourly forecast entries.
+ */
 class LoxWeatherEvent extends LoxEnrichableEvent {
 	typeName = LoxWeatherEvent.name;
 	lastUpdate: number;
@@ -19,6 +23,11 @@ class LoxWeatherEvent extends LoxEnrichableEvent {
 		barometricPressure: number;
 	}[];
 
+	/**
+	 * Parses a weather event, reading the last-update timestamp and all forecast entries.
+	 * @param binaryData data of type Buffer
+	 * @param offset offset
+	 */
 	constructor(binaryData: Buffer, offset: number) {
 		super(binaryData, offset);
 		let offset_add = offset;
@@ -49,14 +58,29 @@ class LoxWeatherEvent extends LoxEnrichableEvent {
 		}
 	}
 
+	/**
+	 * Returns the total byte length of this event: 
+	 * UUID + 4-byte lastUpdate + 4-byte entry count + 68 bytes per entry.
+	 * @returns total byte length 
+	 */
 	override data_length(): number {
 		return this.uuid.data_length + 4 + 4 + this.entries * 68;
 	}
 
+	/**
+	 * Returns the UUID string as the event path (weather events are not
+	 * enriched with room/control names).
+	 * @returns event UUID as string
+	 */
 	override toPath(): string {
 		return this.uuid.stringValue;
 	}
 
+	/**
+	 * Returns a multi-line string listing the last-update timestamp and
+	 * all forecast entries with their weather fields.
+	 * @returns weather forecast as string
+	 */
 	override toString(): string {
 		let str = '{lastUpdate: ' + this.lastUpdate + ', entries: ' + this.entries + ', entry: [\n';
 		for (let i = 0; i < this.entries; i++) {

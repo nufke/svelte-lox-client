@@ -1,10 +1,24 @@
 import MessageType from './MessageType';
 import WsBinHdr from './WsBinHdr';
 
+/**
+ * Class that extends class WsBinHdr by resolving the identifier
+ * byte to a `MessageType` enum value and exposing the estimated-header
+ * flag and the next expected message type.
+ */
 class ParsedHeader extends WsBinHdr {
 	messageType: MessageType;
 	isEstimated: boolean;
 
+	/**
+	 * Constructs a ParsedHeader and resolves the identifier to a MessageType;
+	 * throws an error if the identifier is unknown.
+	 * @param cBinType (optional) start of header
+	 * @param cIdentifier (optional) 8-Bit Unsigned Integer (little endian)
+	 * @param cInfo info
+	 * @param cReserved reserved
+	 * @param nLen 32-Bit Unsigned Integer (little endian)
+	 */
 	constructor(cBinType = 0x03, cIdentifier = 0, cInfo = 0, cReserved = 0, nLen = 0) {
 		super(cBinType, cIdentifier, cInfo, cReserved, nLen);
 
@@ -18,6 +32,9 @@ class ParsedHeader extends WsBinHdr {
 		this.isEstimated = (cInfo & 0x80) !== 0;
 	}
 
+	/**
+	 * Returns the MessageType that the client should expect to receive after this header.
+	 */
 	getNextExpectedMessageType(): MessageType {
 		if (this.isEstimated) {
 			// estimated header is always followed by the real header
